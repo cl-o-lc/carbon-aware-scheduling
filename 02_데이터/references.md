@@ -222,3 +222,10 @@
 - "Even an energy-efficient server still consumes about half its full power when doing virtually no work." (당시 서버 기준, **상한 0.5의 근거**)
 
 - 원문 확인: 6-2, 6-3 인용과 6-1의 개별 결과 페이지는 조사 에이전트가 원문을 열어 확인했고, 6-1의 263건 중앙값은 내려받은 CSV로 직접 다시 계산했다.
+
+## 7. SDG 세부 타깃 원문 (유엔 SDGs 공식 페이지)
+
+- 7.3 (https://sdgs.un.org/goals/goal7): "By 2030, double the global rate of improvement in energy efficiency"
+- 9.4 (https://sdgs.un.org/goals/goal9): "By 2030, upgrade infrastructure and retrofit industries to make them sustainable, with increased resource-use efficiency and greater adoption of clean and environmentally sound technologies and industrial processes, with all countries taking action in accordance with their respective capabilities"
+- 13.2 (https://sdgs.un.org/goals/goal13): "Integrate climate change measures into national policies, strategies and planning" (지표 13.2.2 "Total greenhouse gas emissions per year")
+- 13.3 (같은 페이지): "Improve education, awareness-raising and human and institutional capacity on climate change mitigation, adaptation, impact reduction and early warning"
