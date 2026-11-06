@@ -41,7 +41,7 @@ powershell -ExecutionPolicy Bypass -File scripts/09_export_deck.ps1  # PowerPoin
 - 배출계수: `scripts/config_emission_factors.py` (출처 주석 포함, 2026-11-06 확정)
 - 공통 설정(경로, 분석 연도, 그래프 색): `scripts/common.py`
 - 그래프: `03_분석/figures/`, 처리 로그: `03_분석/logs/`
-- 발표 자료: `04_발표자료/2026 ESD 비교과 공모전(탄소 인지 작업 스케줄링)_박수진.pptx`(git 제외, 스크립트로 재생성)와 같은 이름의 PDF. 글꼴은 Pretendard(설치 필요, PPTX에 포함 저장). 발표 대본은 `04_발표자료/slides_draft.md`에서 읽어 발표자 노트에 넣는다
+- 발표 자료: `04_발표자료/2026 ESD 비교과 공모전(탄소 인지 작업 스케줄링)_박수진.pptx`와 같은 이름의 PDF(둘 다 git 제외, 스크립트로 재생성). 표지의 소속·학번·이름은 `04_발표자료/author.local.txt`(git 제외) 한 줄에서 읽고, 없으면 이름만 넣는다. 글꼴은 Pretendard(설치 필요, PPTX에 포함 저장). 발표 대본은 `04_발표자료/slides_draft.md`에서 읽어 발표자 노트에 넣는다
 
 ## 데이터를 직접 받아야 할 때
 

@@ -205,6 +205,101 @@ FIG_X, FIG_Y, FIG_W = 0.6, 1.85, 8.2      # 그림 폭 8.2인치 = 슬라이드 
 COL_X, COL_W = 9.15, 3.6                  # 오른쪽 글 칸
 
 
+REPO_URL = "github.com/cl-o-lc/carbon-aware-scheduling"
+AUTHOR_FILE = DECK / "author.local.txt"  # 소속·학번·이름 한 줄. 개인정보라 git에 넣지 않는다(.gitignore)
+
+
+def author_line() -> str:
+    return AUTHOR_FILE.read_text(encoding="utf-8").strip() if AUTHOR_FILE.exists() else "박수진"
+
+
+def connector(slide, x1, y1, x2, y2, head=True, dash=False, name="arrow"):
+    from pptx.enum.dml import MSO_LINE_DASH_STYLE
+    from pptx.enum.shapes import MSO_CONNECTOR
+    c = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Inches(x1), Inches(y1), Inches(x2), Inches(y2))
+    c.line.color.rgb = rgb(INK2)
+    c.line.width = Pt(2)
+    if dash:
+        c.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+    if head:
+        te = etree.SubElement(c.line._get_or_add_ln(), qn("a:tailEnd"))
+        te.set("type", "triangle")
+        te.set("w", "med")
+        te.set("len", "med")
+    c.name = name
+    return c
+
+
+def flowchart(s):
+    """슬라이드 6: 15분마다 도는 스케줄러 판단 흐름(PowerPoint 도형, 상자 글자 15~16pt)."""
+    def fbox(x, y, w, h, lines, fill, name):
+        box(s, x, y, w, h, fill, line=INK2, name=name)
+        text_box(s, x + 0.1, y + 0.04, w - 0.2, h - 0.08, lines, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE,
+                 name=name + "_text")
+
+    def label(x, y, t):
+        text_box(s, x, y, 0.75, 0.3, [(t, 14, True, INK)], name=f"flow_label_{t}")
+
+    fbox(2.6, 1.95, 4.2, 0.55, [("15분마다: 대기 중인 작업 확인", 16, True, INK)], LIGHT, "flow_start")
+    fbox(1.2, 2.85, 7.0, 0.95, [("① 마감 가능성 검사", 16, True, INK),
+                                ("아무것도 안 돌려도 마감 빠른 순으로 모두 끝낼 수 있나?", 15, False, INK)], WHITE, "flow_check")
+    fbox(0.6, 4.25, 2.4, 0.95, [("마감이 급한 작업부터", 15, True, INK), ("즉시 실행", 15, True, INK)], "FFE1D3", "flow_force")
+    fbox(3.4, 4.15, 4.8, 1.15, [("② 탄소 기준 (에이징 반영)", 16, True, INK),
+                                ("지금이 남은 시간 중 충분히 깨끗한가?", 15, False, INK),
+                                ("오래 기다릴수록 기준이 넓어진다", 15, False, INK)], WHITE, "flow_carbon")
+    fbox(3.2, 5.85, 2.4, 0.55, [("빈 슬롯에서 실행", 15, True, INK)], LIGHT, "flow_run")
+    fbox(6.0, 5.85, 2.4, 0.55, [("다음 15분까지 대기", 15, True, INK)], "F0F2F1", "flow_wait")
+    connector(s, 4.7, 2.5, 4.7, 2.85)
+    connector(s, 2.0, 3.8, 1.8, 4.25)
+    label(1.05, 3.88, "아니오")
+    connector(s, 5.8, 3.8, 5.8, 4.15)
+    label(5.92, 3.83, "예")
+    connector(s, 4.6, 5.3, 4.4, 5.85)
+    label(4.05, 5.43, "예")
+    connector(s, 7.0, 5.3, 7.2, 5.85)
+    label(7.28, 5.43, "아니오")
+    connector(s, 8.4, 6.125, 8.75, 6.125, head=False, dash=True, name="loop_1")   # 다음 15분에 다시 확인
+    connector(s, 8.75, 6.125, 8.75, 2.225, head=False, dash=True, name="loop_2")
+    connector(s, 8.75, 2.225, 6.8, 2.225, dash=True, name="loop_3")
+    text_box(s, 0.6, 5.5, 2.5, 0.8, [("위반 0건은 ① 덕분", 14, False, INK2), ("에이징은 ② 기준만 조절", 14, False, INK2)],
+             name="flow_note")
+
+
+def cover(s, with_figure=False):
+    who = author_line()
+    if not with_figure:
+        text_box(s, 0.9, 1.5, 12.0, 1.0, [("서버 작업, 언제 돌려야 탄소가 가장 적을까", 38, True, WHITE)], name="title")
+        text_box(s, 0.9, 2.55, 11.5, 0.7, [("탄소 인지 작업 스케줄링", 32, True, SDG7)], name="subtitle")
+        text_box(s, 0.9, 3.6, 11.0, 0.9, [("미뤄도 되는 컴퓨터 일을 전기가 깨끗한 시간으로 옮기면,", 22, False, "DDE5E1"),
+                                          ("같은 일을 더 적은 탄소로 할 수 있다", 22, False, "DDE5E1")], name="key_message")
+        for i, (lab, col) in enumerate((("SDG 7.3", SDG7), ("SDG 9.4", SDG9), ("SDG 13.3", SDG13))):
+            sdg_chip(s, 0.9 + i * 1.45, 4.95, lab, col)
+        text_box(s, 0.9, 6.25, 11.6, 0.5, [(f"2026학년도 ESD 비교과 공모전  |  {who}", 20, False, WHITE)], name="author")
+        return
+    # 시안: 오른쪽에 탄소 곡선·요금 시간대 그림
+    text_box(s, 0.9, 0.95, 12.0, 0.8, [("서버 작업, 언제 돌려야 탄소가 가장 적을까", 38, True, WHITE)], name="title")
+    text_box(s, 0.9, 1.85, 11.5, 0.6, [("탄소 인지 작업 스케줄링", 30, True, SDG7)], name="subtitle")
+    text_box(s, 0.9, 3.0, 5.8, 1.2, [("미뤄도 되는 컴퓨터 일을", 22, False, "DDE5E1"), ("전기가 깨끗한 시간으로 옮기면,", 22, False, "DDE5E1"),
+                                     ("같은 일을 더 적은 탄소로 할 수 있다", 22, False, "DDE5E1")], name="key_message")
+    for i, (lab, col) in enumerate((("SDG 7.3", SDG7), ("SDG 9.4", SDG9), ("SDG 13.3", SDG13))):
+        sdg_chip(s, 0.9 + i * 1.45, 4.55, lab, col)
+    text_box(s, 0.9, 5.65, 5.9, 0.9, [("2026학년도 ESD 비교과 공모전", 18, False, WHITE), (who, 18, False, WHITE)], name="author")
+    box(s, 7.0, 2.85, 5.75, 3.6, WHITE, name="figure_card")
+    picture(s, FIGS / "05_탄소곡선_요금시간대.png", 7.1, 2.95, 5.55, "figure")
+
+
+def build_cover_option():
+    prs = Presentation()
+    prs.slide_width, prs.slide_height = Inches(SW), Inches(SH)
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    background(s, INK)
+    cover(s, with_figure=True)
+    BUILD.mkdir(parents=True, exist_ok=True)
+    out = BUILD / "cover_option.pptx"
+    prs.save(out)
+    print(out)
+
+
 def build():
     N = numbers()
     notes = scripts_from_draft()
@@ -223,13 +318,7 @@ def build():
 
     # 1 표지
     s = new(dark=True)
-    text_box(s, 0.9, 1.5, 12.0, 1.0, [("서버 작업, 언제 돌려야 탄소가 가장 적을까", 38, True, WHITE)], name="title")
-    text_box(s, 0.9, 2.55, 11.5, 0.7, [("탄소 인지 작업 스케줄링", 32, True, SDG7)], name="subtitle")
-    text_box(s, 0.9, 3.6, 11.0, 0.9, [("미뤄도 되는 컴퓨터 일을 전기가 깨끗한 시간으로 옮기면,", 22, False, "DDE5E1"),
-                                      ("같은 일을 더 적은 탄소로 할 수 있다", 22, False, "DDE5E1")], name="key_message")
-    for i, (lab, col) in enumerate((("SDG 7.3", SDG7), ("SDG 9.4", SDG9), ("SDG 13.3", SDG13))):
-        sdg_chip(s, 0.9 + i * 1.45, 4.95, lab, col)
-    text_box(s, 0.9, 6.25, 11.0, 0.5, [("2026학년도 ESD 비교과 공모전  |  박수진", 20, False, WHITE)], name="author")
+    cover(s)
 
     # 2 문제
     s = new()
@@ -305,7 +394,7 @@ def build():
     # 6 설계
     s = new()
     header(s, "스케줄러 설계: 탄소는 아끼고, 마감은 지킨다", "탄소만 쫓으면 마감을 놓친다. 그래서 15분마다 마감을 검사한다", 6)
-    picture(s, FIGS / "06_스케줄러_흐름도.png", FIG_X, FIG_Y, FIG_W, "figure")
+    flowchart(s)
     bullets(s, COL_X, 1.95, COL_W, 3.4, [
         "탄소 비용 = 전력 × 시간 × 그 시간의 탄소집약도",
         [("마감 위반 0건은 15분마다 하는 가능성 검사 덕분", True), (f" (탄소만 쫓으면 1년 {N['B_late']:,}건 위반)", False)],
@@ -354,21 +443,26 @@ def build():
     # 10 SDG
     s = new()
     header(s, "SDG 타깃과 기대 효과", "설비를 새로 사지 않고, 운영 방식만 바꿔 기여한다", 10)
-    sdgs = [("SDG 7.3", "에너지 효율 개선", "같은 일을 더 적은 탄소로,\nDVFS를 더하면 더 적은 에너지로", SDG7),
-            ("SDG 9.4", "청정기술로 산업·인프라 개선", "소프트웨어만 바꿔 깨끗한 전기를\n더 많이 쓴다", SDG9),
-            ("SDG 13.3", "기후 대응 역량·인식", "대학 서버 운영 관행을 바꾸는 사례.\n코드·데이터 공개로 누구나 재현", SDG13)]
-    for i, (code, goal, body, col) in enumerate(sdgs):
+    # 타깃 요지는 유엔 원문(references.md 7장)을 한 줄로 옮긴 것
+    sdgs = [("SDG 7.3", "에너지 효율 개선", "타깃: 2030년까지 에너지 효율 개선 속도를 두 배로",
+             "같은 일을 더 적은 탄소로,\nDVFS를 더하면 더 적은 에너지로", SDG7),
+            ("SDG 9.4", "청정기술로 산업·인프라 개선", "타깃: 깨끗하고 친환경적인 기술로 산업·인프라를 지속가능하게",
+             "소프트웨어만 바꿔 깨끗한 전기를\n더 많이 쓴다", SDG9),
+            ("SDG 13.3", "기후 대응 역량·인식", "타깃: 기후변화 완화에 관한 교육·인식·역량 강화",
+             "대학 서버 운영 관행을 바꾸는 사례\n코드와 데이터 출처를 공개해 누구나 재현 가능(GitHub)", SDG13)]
+    for i, (code, goal, target, body, col) in enumerate(sdgs):
         x = 0.6 + i * 4.1
-        box(s, x, 1.95, 3.85, 2.85, "F4F7F5", name=f"sdg_card_{i + 1}")
+        box(s, x, 1.95, 3.85, 3.5, "F4F7F5", name=f"sdg_card_{i + 1}")
         sdg_chip(s, x + 0.3, 2.2, code, col, w=1.6, h=0.55, size=20)
-        text_box(s, x + 0.3, 2.95, 3.3, 0.5, [(goal, 20, True, INK)], name=f"sdg_goal_{i + 1}")
-        text_box(s, x + 0.3, 3.55, 3.35, 1.5, [(line, 18, False, INK) for line in body.split("\n")], name=f"sdg_body_{i + 1}")
-    text_box(s, 0.6, 5.2, 12.1, 0.5, [[("가상 대학 서버(작업 30개) 1년: ", 20, False, INK),
+        text_box(s, x + 0.3, 2.92, 3.3, 0.45, [(goal, 20, True, INK)], name=f"sdg_goal_{i + 1}")
+        text_box(s, x + 0.3, 3.42, 3.35, 0.8, [(target, 18, False, INK2)], name=f"sdg_target_{i + 1}")
+        text_box(s, x + 0.3, 4.3, 3.35, 1.05, [(line, 18, False, INK) for line in body.split("\n")], name=f"sdg_body_{i + 1}")
+    text_box(s, 0.6, 5.75, 12.1, 0.5, [[("가상 대학 서버(작업 30개) 1년: ", 20, False, INK),
                                         (f"{N['emis_A']:,.1f} → {N['emis_C']:,.1f} kgCO2eq", 20, True, SDG13),
                                         ("  (새 설비 없이)", 20, False, INK)]], name="effect_line")
-    text_box(s, 0.6, 5.85, 12.1, 0.45, [("구글도 2020년부터 실제 데이터센터에서 비슷한 방식을 쓰기 시작했다", 18, False, INK2)],
+    text_box(s, 0.6, 6.3, 12.1, 0.45, [("구글도 2020년부터 실제 데이터센터에서 비슷한 방식을 쓰기 시작했다", 18, False, INK2)],
              name="google_line")
-    footnote(s, "자료: 유엔 SDGs 세부 타깃(sdgs.un.org), Google 공식 블로그(2020.4.22), Radovanović et al.(2023) IEEE Trans. Power Systems")
+    footnote(s, f"자료: 유엔 SDGs(sdgs.un.org), Google 블로그(2020.4.22), Radovanović 외(2023)  |  코드·데이터 출처: {REPO_URL}")
 
     # 11 한계와 결론
     s = new(dark=True)
@@ -394,4 +488,7 @@ def build():
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
-    build()
+    if "--cover-option" in sys.argv:
+        build_cover_option()
+    else:
+        build()
