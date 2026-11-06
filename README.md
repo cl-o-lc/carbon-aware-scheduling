@@ -29,6 +29,7 @@ python scripts/02_carbon_intensity.py  # 1단계: 시간별 탄소집약도, 변
 python scripts/03_stage1_report.py   # 1단계: 결과 요약 문서 -> 03_분석/summary_stage1.md
 python scripts/04_simulate.py        # 2단계: 스케줄링 시뮬레이션(있는 탄소 곡선 모두) -> 03_분석/stage2/
 python scripts/05_stage2_report.py   # 2단계: 결과 요약 문서 -> 03_분석/stage2_summary.md
+python scripts/06_presentation_figures.py  # 발표용 그래프 모으기 -> 04_발표자료/figures/
 ```
 
 - 시뮬레이션 설정과 가정(작업 세트, 슬롯 수, DVFS, 에이징): `scripts/config_simulation.py`

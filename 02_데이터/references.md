@@ -177,7 +177,48 @@
   - "금번에 시행된 산업용(을) 이외에 일반용·교육용 등 시간대별 요금이 적용되는 다른 종별에 대해서는 6월 1일부터 적용할 예정입니다."
 - 정리: 개편 후에도 경부하는 22:00~08:00로 그대로이고, 새벽 2시는 개편 전후 모든 계절 경부하다. 개편은 봄·여름·가을 평일의 중간·최대부하 구간만 바꿨다(겨울 미변경). 원문 보도참고자료(붙임 표)는 정부 사이트에서 원본을 찾지 못해 인용하지 않았다.
 
+### 5-3. 한낮(12~14시)은 어느 시간대인가
+
+| 구분 | 개편 전(2025년, 5-1 표) | 개편 후(2026년, 5-2) |
+|---|---|---|
+| 평일 봄·여름·가을 12~13시 | 중간부하 | 중간부하 (08~15시 중간) |
+| 평일 봄·여름·가을 13~14시 | 최대부하 | 중간부하 |
+| 평일 겨울 12~14시 | 중간부하 (12~16시) | 중간부하 (겨울 미변경) |
+| 새벽 2시 (모든 계절) | 경부하 | 경부하 |
+| 일요일·공휴일 | 하루 종일 경부하로 계량 (약관 별표3) | 같음 |
+| 토요일 | 최대부하 시간을 중간부하로 계량 | 같음(개편 문서는 평일만 언급) |
+
+- 근거: 5-1 표(약관 별표3), 5-2 정책뉴스 2026-04-14 "평일 오전 11시~오후 3시에 적용되던 최고요금(최대부하)이 중간요금(중간부하)으로" 및 2026-03-13 "시간대별 구분 기준 조정은 산업용(을) 외에도 산업용(갑)Ⅱ, 일반용(갑)Ⅱ, 일반용(을), 교육용(을) 등 계절·시간대별 요금이 적용되는 다른 종별에도 공통적으로 적용한다."
+- 주말 할인(2026년, 정책뉴스 2026-03-13, https://www.korea.kr/news/policyNewsView.do?newsId=148960823): "출력제어가 가장 빈번하게 발생하는 봄(3~5월)·가을(9~10월) 주말 및 공휴일 오전 11시~오후 2시에는 요금을 50% 할인한다." "이 같은 개편안은 2030년 12월 31일까지 약 5년 간 운영". 이 할인은 같은 기사에서 '산업용(을) 개편 내용'으로 소개되며, 교육용(을) 등 다른 종별에는 "시간대별 구분 기준 조정"을 공통 적용한다고만 적혀 있다. 대학(교육용)에 주말 할인이 적용되는지는 확인하지 못했다.
+- 결론: **평일에는 가장 싼 시간(경부하, 22~08시)과 가장 깨끗한 시간(한낮, 중간부하)이 다르다**는 점이 개편 전후 모두 성립한다. 다만 2026년 개편으로 산업용(을)은 봄·가을 주말·공휴일 한낮이 50% 할인되어, 그 시간에는 '싼 시간'과 '깨끗한 시간'이 겹치기 시작했다. 정부도 "출력제어가 가장 빈번하게 발생하는"(태양광이 남는) 한낮으로 수요를 옮기려 한다는 뜻이다.
+
 ### 발표 메시지와의 연결
 
 - 요금이 가장 싼 시간(경부하, 22~08시)과 탄소가 가장 적은 시간(1단계 분석: 한낮 10~14시)이 다르다.
 - 정부도 2026년 개편에서 "낮 시간대로 전력 소비를 유인"하고, 저녁 18~21시를 "화석연료 발전 가동이 증가되는" 시간으로 보고 최고요금으로 바꿨다. 1단계에서 저녁 19~23시가 가장 탄소가 많았던 결과와 방향이 같다.
+
+## 6. 서버 전력 중 CPU 주파수와 무관한 부분 (DVFS 모델의 정적 전력 비율)
+
+### 6-1. SPECpower_ssj2008 공개 결과 (유휴 전력 비율)
+
+- 결과 목록 CSV(SPEC 결과 검색의 "Download as CSV"): https://www.spec.org/cgi-bin/osgresults?conf=power_ssj2008&op=fetch&format=csvdump&proj-COMPANY=256&proj-SYSTEM=256&proj-NODES=256&proj-CHIPS=256&proj-CORES=256&proj-CPU=256&proj-FORMFACTOR=256&proj-PUBLISH=256&proj-PEAK=256&proj-WATTSAT100=256&proj-WATTSAT50=256&proj-WATTSATAA=256&proj-FDRURL=256
+- 계산(2026-11-07 직접 재계산): 2023~2026년 공개, Nodes = 1, # Chips = 1 또는 2, 프로세서 이름에 Xeon 또는 EPYC가 들어간 결과 **263건**의 "Average watts @ active idle" / "Average watts @ 100% of target load" 비율 **중앙값 0.213**, 사분위 범위 0.180~0.276.
+- 개별 결과 예시(결과 페이지 확인):
+  - Dell PowerEdge R7725, 2x AMD EPYC 9845 (2026-06 공개): 100% 711W, active idle 110W, 비율 0.155. https://www.spec.org/power_ssj2008/results/res2026q2/power_ssj2008-20260615-01578.html
+  - Lenovo ThinkSystem SR650 V4, 2x Intel Xeon 6787P (2026-08 공개): 886W, 198W, 0.223. https://www.spec.org/power_ssj2008/results/res2026q3/power_ssj2008-20260727-01581.html
+  - HPE ProLiant Compute DL380 Gen12, 2x Intel Xeon 6780E (2025-02 공개): 801W, 220W, 0.275. https://www.spec.org/power_ssj2008/results/res2025q1/power_ssj2008-20250208-01490.html
+- 해석: 유휴 전력에는 메모리, 디스크, 네트워크, 팬, 전원 손실이 들어 있어 CPU 주파수를 낮춰도 줄지 않는다. 다만 유휴 상태의 CPU는 깊은 절전 상태라 부하 중 최저 주파수보다 전력이 적으므로, 이 비율은 '주파수와 무관한 전력 비율'의 **하한**으로 본다.
+
+### 6-2. Barroso, Hölzle, Ranganathan, "The Datacenter as a Computer" 3판 (Morgan & Claypool, 2018)
+
+- DOI 10.1007/978-3-031-01761-2, 공개 PDF: https://link.springer.com/content/pdf/10.1007/978-3-031-01761-2.pdf (5장)
+- 5.3절(Google x86 서버, 2012년경): "the CPU portion (everything inside a CPU socket) is once more the dominant energy consumer in servers, using two-thirds of the energy at peak utilization and about 40% when (active) idle."
+- 같은 절: "the dynamic range of memory systems, disk drives, and networking equipment is much lower: approximately 2.0x for memory, 1.3x for disks, and less than 1.2x for networking switches. This suggests that energy proportionality at the system level cannot be achieved through CPU optimizations alone"
+- 해석: 최대 부하에서 CPU가 2/3를 쓰므로 CPU 밖 약 1/3은 CPU 주파수 조절(DVFS)로 줄일 수 없다. **기준값 0.33의 근거.**
+
+### 6-3. Barroso & Hölzle, "The Case for Energy-Proportional Computing", IEEE Computer, 2007년 12월
+
+- PDF: https://www3.cs.stonybrook.edu/~anshul/courses/cse591_s16/energy_proportional.pdf
+- "Even an energy-efficient server still consumes about half its full power when doing virtually no work." (당시 서버 기준, **상한 0.5의 근거**)
+
+- 원문 확인: 6-2, 6-3 인용과 6-1의 개별 결과 페이지는 조사 에이전트가 원문을 열어 확인했고, 6-1의 263건 중앙값은 내려받은 CSV로 직접 다시 계산했다.

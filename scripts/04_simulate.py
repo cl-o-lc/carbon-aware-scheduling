@@ -37,7 +37,7 @@ FIG = S2 / "figures"
 CLS_COLOR = {"당일": C_BLUE, "익일": C_ORANGE, "주간": C_AQUA}
 POLICIES = ["A", "A'", "B", "C", "D", "E", "C7"]
 POLICY_NAME = {"A": "A 현재 관행(새벽 2시 고정)", "A'": "A' 도착 즉시", "B": "B 탄소 인지 탐욕",
-               "C": "C B+에이징", "D": "D C+DVFS", "E": "E C+전주 예측 곡선", "C7": "C7 C(주간 작업 익일까지만)"}
+               "C": "C B+에이징+마감 검사", "D": "D C+DVFS", "E": "E C+전주 예측 곡선", "C7": "C7 C(주간 작업 익일까지만)"}
 K_STEPS_PER_H = int(round(1 / cfg.STEP_H))
 KR_HOL = holidays.KR(years=[2025, 2026])
 
@@ -301,6 +301,7 @@ def run_curve(name: str, jobs: list[Job]) -> dict:
     cv = Curve(name)
     t_end = horizon_end(jobs)
     rows = []
+    delays = {}  # (정책, 마감 구분) -> 작업별 지연(h) 목록
     for di, d in enumerate(cv.dates):
         act = cv.window(di, t_end)
         fc = cv.window(di, t_end, forecast=True)
@@ -310,10 +311,12 @@ def run_curve(name: str, jobs: list[Job]) -> dict:
             dec = fc if p == "E" else act
             cap = 24 + cfg.FIXED_START_H + cfg.DEADLINE_WINDOW_H[1] if p == "C7" else None
             r = simulate(jobs, act, dec, "C" if p in ("E", "C7") else p, deadline_cap=cap)
+            for c, g in r.groupby("cls"):
+                delays.setdefault((p, c), []).extend(g["delay_h"].tolist())
             rows.append({"date": d, "policy": p, "daykind": day_kind(d), "season": season(d), **summarize(r, d)})
         for sf in cfg.STATIC_FRAC_SENS:
             r = simulate(jobs, act, act, "D", static_frac=sf)
-            rows.append({"date": d, "policy": f"D(정적 {sf:.1f})", "daykind": day_kind(d), "season": season(d),
+            rows.append({"date": d, "policy": f"D(정적 {sf:.2f})", "daykind": day_kind(d), "season": season(d),
                          **summarize(r, d)})
         for g in cfg.AGING_GAMMA_SENS:
             if g == cfg.AGING_GAMMA:
@@ -323,7 +326,12 @@ def run_curve(name: str, jobs: list[Job]) -> dict:
                          **summarize(r, d)})
     res = pd.DataFrame(rows)
     res.to_csv(S2 / f"daily_results_{name}.csv", index=False, encoding="utf-8-sig", float_format="%.4f")
-    return {"name": name, "res": res, "curve": cv}
+    dstat = {}
+    for (p, c), v in delays.items():
+        a = np.array(v)
+        dstat.setdefault(p, {})[c] = {"평균": float(a.mean()), "중앙값": float(np.median(a)),
+                                      "90백분위": float(np.percentile(a, 90)), "최대": float(a.max())}
+    return {"name": name, "res": res, "curve": cv, "delays": dstat}
 
 
 def pick_representative(cv: Curve, valid_dates: set) -> dict[str, pd.Timestamp]:
@@ -348,14 +356,14 @@ def pick_representative(cv: Curve, valid_dates: set) -> dict[str, pd.Timestamp]:
     return pick
 
 
-def gantt(plt, jobs, cv: Curve, d: pd.Timestamp, label: str, name: str):
+def gantt(plt, jobs, cv: Curve, d: pd.Timestamp, label: str, name: str, pols=("A", "B", "C", "D"), tag: str = ""):
     di = list(cv.dates).index(d)
     t_end = horizon_end(jobs)
     act = cv.window(di, t_end)
-    pols = ["A", "B", "C", "D"]
+    pols = list(pols)
     sims = {p: simulate(jobs, act, act, p) for p in pols}
     x_max = 40.0
-    fig, axes = plt.subplots(len(pols) + 1, 1, figsize=(12, 8.5), sharex=True,
+    fig, axes = plt.subplots(len(pols) + 1, 1, figsize=(12, 2.0 + 1.65 * len(pols)), sharex=True,
                              gridspec_kw={"height_ratios": [1.3] + [1] * len(pols)})
     t = cfg.T0_H + np.arange(len(act)) * cfg.STEP_H
     m = t <= x_max
@@ -378,10 +386,10 @@ def gantt(plt, jobs, cv: Curve, d: pd.Timestamp, label: str, name: str):
         ax.set_yticklabels([f"슬롯{i + 1}" for i in range(cfg.SLOTS)], fontsize=9)
         ax.set_ylim(-0.6, cfg.SLOTS - 0.4)
         ax.grid(axis="y", visible=False)
-        note = f"배출 {tot / 1000:.2f} kgCO2eq" + ("" if p == "A" else f" (A 대비 {-(1 - tot / base) * 100:+.1f}%)")
+        note = f"배출 {tot / 1000:.2f} kgCO2eq" + ("" if p == "A" else f" (A 대비 {(1 - tot / base) * 100:.1f}% 절감)")
         note += f", 마감 위반 {int(r['late'].sum())}건"
         if beyond:
-            note += f", 40시간 이후 시작 {beyond}개(주간 작업)"
+            note += f", 주간 작업 {beyond}개는 그래프 밖(40시간 이후)에서 실행"
         ax.set_title(f"{POLICY_NAME[p]}: {note}", fontsize=10, loc="left")
     xt = np.arange(-4, x_max + 1, 4)
     axes[-1].set_xticks(xt)
@@ -390,10 +398,11 @@ def gantt(plt, jobs, cv: Curve, d: pd.Timestamp, label: str, name: str):
     axes[-1].set_xlim(cfg.T0_H, x_max)
     from matplotlib.patches import Patch
     hs = [Patch(color=c, label=f"{k} 마감 작업") for k, c in CLS_COLOR.items()]
-    hs.append(Patch(facecolor="white", edgecolor=C_INK2, hatch="///", label="주파수 낮춤(DVFS)"))
-    fig.legend(handles=hs, loc="lower center", ncol=4, bbox_to_anchor=(0.5, -0.02), fontsize=9)
+    if "D" in pols:
+        hs.append(Patch(facecolor="white", edgecolor=C_INK2, hatch="///", label="주파수 낮춤(DVFS)"))
+    fig.legend(handles=hs, loc="lower center", ncol=len(hs), bbox_to_anchor=(0.5, -0.02), fontsize=9)
     fig.tight_layout(rect=(0, 0.03, 1, 1))
-    fn = FIG / f"gantt_{name}_{d:%Y%m%d}.png"
+    fn = FIG / f"gantt{tag}_{name}_{d:%Y%m%d}.png"
     fig.savefig(fn)
     plt.close(fig)
     rows = []
@@ -440,7 +449,7 @@ def bars(plt, tables: dict):
         for p, x_, y_ in zip(pols, xs, v):
             ax.annotate(f"{y_:.1f}", (x_, y_), xytext=(0, 3 if y_ >= 0 else -11), textcoords="offset points",
                         ha="center", fontsize=8, color=C_INK)
-        lo, hi = (t.loc[f"D(정적 {sf:.1f})", "A 대비 절감률(%)"] for sf in (0.6, 0.2))
+        lo, hi = (t.loc[f"D(정적 {sf:.2f})", "A 대비 절감률(%)"] for sf in (max(cfg.STATIC_FRAC_SENS), min(cfg.STATIC_FRAC_SENS)))
         xd = xs[pols.index("D")]
         ax.errorbar([xd], [t.loc["D", "A 대비 절감률(%)"]], yerr=[[t.loc["D", "A 대비 절감률(%)"] - lo],
                     [hi - t.loc["D", "A 대비 절감률(%)"]]], fmt="none", ecolor=C_INK, capsize=4, linewidth=1)
@@ -450,7 +459,7 @@ def bars(plt, tables: dict):
     ax.set_xticklabels([f"{POLICY_NAME[p]}\n마감 위반 {lates[p]}건" for p in pols], fontsize=8.5)
     ax.set_ylim(min(-3, ax.get_ylim()[0]), None)
     ax.set_ylabel("현재 관행(A) 대비 연간 절감률 (%)")
-    ax.set_title("정책별 연간 배출 절감률 (D의 세로선: 정적 전력 비율 0.6~0.2 가정 범위)", fontsize=11)
+    ax.set_title(f"정책별 연간 배출 절감률 (D의 세로선: 정적 전력 비율 {max(cfg.STATIC_FRAC_SENS)}~{min(cfg.STATIC_FRAC_SENS)} 가정 범위)", fontsize=11)
     ax.legend(fontsize=9, loc="upper left")
     ax.grid(axis="x", visible=False)
     fn = FIG / "bar_annual_savings.png"
@@ -538,6 +547,7 @@ def main(argv):
         tables[name] = annual_table(a)
         tables[name].to_csv(S2 / f"annual_{name}.csv", index=False, encoding="utf-8-sig", float_format="%.4f")
         extras[name] = extra_metrics(r)
+        extras[name]["지연"] = r["delays"]
         figs[f"hist_{name}"] = str(hist(plt, r, name).relative_to(OUT.parent))
         if name == main_name or name == "market":
             valid = set(a["date"])
@@ -546,6 +556,10 @@ def main(argv):
                 fn, rows = gantt(plt, jobs, r["curve"], d, label, name)
                 figs[f"gantt_{name}_{label}"] = str(fn.relative_to(OUT.parent))
                 rep_rows += [{"곡선": name, **x} for x in rows]
+            if name == main_name:
+                d = reps["봄 맑은 평일"]
+                fn, _ = gantt(plt, jobs, r["curve"], d, "봄 맑은 평일", name, pols=("A", "C"), tag="_AC")
+                figs[f"gantt_AC_{name}_봄 맑은 평일"] = str(fn.relative_to(OUT.parent))
         print(tables[name][["정책", "emis_g", "A 대비 절감률(%)", "late", "late_days", "delay_h"]].round(2).to_string())
     figs["bar"] = str(bars(plt, tables).relative_to(OUT.parent))
     pd.DataFrame(rep_rows).to_csv(S2 / "representative_days.csv", index=False, encoding="utf-8-sig", float_format="%.3f")

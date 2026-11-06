@@ -12,8 +12,15 @@ LATE_GRACE_H = 30.0      # 마감을 넘긴 작업도 끝까지 돌리기 위한
 
 # DVFS 단순 모델 (사용자 지정)
 FREQS = (1.0, 0.8, 0.6)  # 주파수 단계(최대 대비)
-STATIC_FRAC = 0.4        # f=1에서 평균 전력 중 정적 전력 비율 (가정, 민감도 0.2/0.6 함께 계산)
-STATIC_FRAC_SENS = (0.2, 0.6)
+# 정적 전력 비율 = f=1에서 평균 전력 중 CPU 주파수와 무관한 부분(메모리, 디스크, 네트워크, 팬, 전원 손실 등).
+#   기준 0.33: Barroso, Hölzle, Ranganathan, "The Datacenter as a Computer" 3판(2018) 5.3절,
+#             CPU 소켓이 "two-thirds of the energy at peak utilization"을 쓴다 -> CPU 밖 1/3은 DVFS로 못 줄임
+#   하한 0.21: SPECpower_ssj2008 2023~2026년 공개 결과(1노드, 1~2소켓 Xeon/EPYC, 263건)의
+#             active idle / 100% 부하 전력 비율 중앙값 0.213 (유휴 전력은 비확장 전력의 하한)
+#   상한 0.5 : Barroso & Hölzle(2007) "about half its full power when doing virtually no work" (옛 서버)
+#   출처 원문과 계산 방법: 02_데이터/references.md 6장
+STATIC_FRAC = 0.33
+STATIC_FRAC_SENS = (0.21, 0.5)
 # 동적 전력 ∝ f³ (전압 V ∝ f 가정), 실행 시간 = 기준시간 × (메모리바운드비율 + CPU바운드비율 / f)
 
 # 에이징(C): 대기 비율 u = (지금 - 도착) / (최종 시작 가능 시각 - 도착), 0→1
