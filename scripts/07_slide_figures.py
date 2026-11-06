@@ -257,6 +257,31 @@ def fig_gantt_ac(plt, name: str):
     plt.close(fig)
 
 
+def fig_cover_curve(plt, name: str):
+    """표지 시안용: 05 그림에서 주석·캡션을 빼고 곡선·요금 색 띠·점 두 개·축만 남김. 축 글자 1.5배."""
+    h = pd.read_csv(OUT / CURVES[name][1], parse_dates=["date"])
+    sel = h[h["date"].dt.month.isin([3, 4, 5, 9, 10]) & (h["daytype"] == "평일")]
+    c = sel.groupby("slot")["ci"].mean()
+    tick, label = 16 * 1.5, 19 * 1.5
+    fig, ax = plt.subplots(figsize=(W, H))
+    for a, b, k in TOU_SPRING_FALL_WEEKDAY:
+        ax.axvspan(a - 0.5, b - 0.5, color=TOU_COLOR[k], linewidth=0, zorder=0)
+    ax.plot(c.index, c.values, color=C_INK, linewidth=4, marker="o", markersize=8, zorder=3)
+    m = int(c.idxmin())
+    ax.scatter([cfg.NIGHT_SLOT], [c[cfg.NIGHT_SLOT]], s=380, color=SDG9, zorder=4, edgecolor="white", linewidth=2.5)
+    ax.scatter([m], [c[m]], s=380, color=SDG13, zorder=4, edgecolor="white", linewidth=2.5)
+    ax.set_xlim(-0.5, 23.5)
+    ax.set_ylim(c.min() - 15, c.max() + 15)
+    ax.set_xticks(range(0, 24, 6))
+    ax.set_xticklabels([f"{x}시" for x in range(0, 24, 6)])
+    ax.tick_params(labelsize=tick)
+    ax.set_ylabel("gCO2eq/kWh", fontsize=label)
+    ax.grid(axis="x", visible=False)
+    fig.tight_layout()
+    fig.savefig(DEST / "11_표지용_탄소곡선.png")
+    plt.close(fig)
+
+
 def main():
     DEST.mkdir(parents=True, exist_ok=True)
     plt = setup_matplotlib()
@@ -266,6 +291,7 @@ def main():
     fig_gantt_ac(plt, name)
     print("09, 10 ok")
     print("05", fig_curve_tou(plt, name))
+    fig_cover_curve(plt, name)
     fig_flow(plt)
     print("06 ok")
     print("07", {k: (round(x, 2) if isinstance(x, float) else x) for k, x in fig_weekend(plt, name).items()})

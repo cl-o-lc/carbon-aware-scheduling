@@ -268,7 +268,7 @@ def flowchart(s):
 def cover(s, with_figure=False):
     who = author_line()
     if not with_figure:
-        text_box(s, 0.9, 1.5, 12.0, 1.0, [("서버 작업, 언제 돌려야 탄소가 가장 적을까", 38, True, WHITE)], name="title")
+        text_box(s, 0.9, 1.5, 12.0, 1.0, [("서버 작업, 언제 돌려야 탄소가 가장 적을까", 40, True, WHITE)], name="title")
         text_box(s, 0.9, 2.55, 11.5, 0.7, [("탄소 인지 작업 스케줄링", 32, True, SDG7)], name="subtitle")
         text_box(s, 0.9, 3.6, 11.0, 0.9, [("미뤄도 되는 컴퓨터 일을 전기가 깨끗한 시간으로 옮기면,", 22, False, "DDE5E1"),
                                           ("같은 일을 더 적은 탄소로 할 수 있다", 22, False, "DDE5E1")], name="key_message")
@@ -278,14 +278,22 @@ def cover(s, with_figure=False):
         return
     # 시안: 오른쪽에 탄소 곡선·요금 시간대 그림
     text_box(s, 0.9, 0.95, 12.0, 0.8, [("서버 작업, 언제 돌려야 탄소가 가장 적을까", 38, True, WHITE)], name="title")
-    text_box(s, 0.9, 1.85, 11.5, 0.6, [("탄소 인지 작업 스케줄링", 30, True, SDG7)], name="subtitle")
+    text_box(s, 0.9, 1.85, 5.8, 0.6, [("탄소 인지 작업 스케줄링", 30, True, SDG7)], name="subtitle")
     text_box(s, 0.9, 3.0, 5.8, 1.2, [("미뤄도 되는 컴퓨터 일을", 22, False, "DDE5E1"), ("전기가 깨끗한 시간으로 옮기면,", 22, False, "DDE5E1"),
                                      ("같은 일을 더 적은 탄소로 할 수 있다", 22, False, "DDE5E1")], name="key_message")
     for i, (lab, col) in enumerate((("SDG 7.3", SDG7), ("SDG 9.4", SDG9), ("SDG 13.3", SDG13))):
         sdg_chip(s, 0.9 + i * 1.45, 4.55, lab, col)
-    text_box(s, 0.9, 5.65, 5.9, 0.9, [("2026학년도 ESD 비교과 공모전", 18, False, WHITE), (who, 18, False, WHITE)], name="author")
-    box(s, 7.0, 2.85, 5.75, 3.6, WHITE, name="figure_card")
-    picture(s, FIGS / "05_탄소곡선_요금시간대.png", 7.1, 2.95, 5.55, "figure")
+    author_y, author_h = 5.65, 0.65
+    text_box(s, 0.9, author_y, 5.9, author_h, [("2026학년도 ESD 비교과 공모전", 18, False, WHITE), (who, 18, False, WHITE)],
+             name="author")
+    # 그림 카드의 세로 중심 = 왼쪽 글 블록(제목 위 ~ 학번 줄 아래)의 세로 중심
+    block_top, block_bottom = 0.95, author_y + author_h
+    card_w, card_h = 5.75, 3.6
+    card_y = (block_top + block_bottom) / 2 - card_h / 2
+    box(s, 7.0, card_y, card_w, card_h, WHITE, name="figure_card")
+    pic_w = 5.55
+    pic_h = pic_w * 9 / 16
+    picture(s, FIGS / "11_표지용_탄소곡선.png", 7.0 + (card_w - pic_w) / 2, card_y + (card_h - pic_h) / 2, pic_w, "figure")
 
 
 def build_cover_option():
