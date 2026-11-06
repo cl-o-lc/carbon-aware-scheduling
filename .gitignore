@@ -1,0 +1,10 @@
+# 원본 데이터는 scripts/00_download_data.py로 다시 받는다 (README 참고)
+02_데이터/raw/
+01_공고_신청서/
+05_영상/
+99_제출/
+*.hwp
+*.pptx
+*.zip
+__pycache__/
+.venv/
