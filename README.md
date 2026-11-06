@@ -27,7 +27,12 @@ python scripts/00_download_data.py   # 0단계: 공공데이터포털 원본 다
 python scripts/01_profile_raw.py     # 0단계: 인코딩, 컬럼, 행 수, 기간, 연료원 점검 -> 02_데이터/raw_profile.md
 python scripts/02_carbon_intensity.py  # 1단계: 시간별 탄소집약도, 변동폭 지표, 민감도, 그래프 -> 03_분석/
 python scripts/03_stage1_report.py   # 1단계: 결과 요약 문서 -> 03_분석/summary_stage1.md
+python scripts/04_simulate.py        # 2단계: 스케줄링 시뮬레이션(있는 탄소 곡선 모두) -> 03_분석/stage2/
+python scripts/05_stage2_report.py   # 2단계: 결과 요약 문서 -> 03_분석/stage2_summary.md
 ```
+
+- 시뮬레이션 설정과 가정(작업 세트, 슬롯 수, DVFS, 에이징): `scripts/config_simulation.py`
+- 탄소 곡선 선택: `scripts/common.py`의 `CURVES`. 5분 단위 태양광 집계 곡선(`grid`)이 있으면 그것이 주 결과, 없으면 시장 거래량만(`market`)
 
 - 배출계수: `scripts/config_emission_factors.py` (출처 주석 포함, 2026-11-06 확정)
 - 공통 설정(경로, 분석 연도, 그래프 색): `scripts/common.py`
