@@ -30,7 +30,9 @@ python scripts/03_stage1_report.py   # 1단계: 결과 요약 문서 -> 03_분�
 python scripts/04_simulate.py        # 2단계: 스케줄링 시뮬레이션(있는 탄소 곡선 모두) -> 03_분석/stage2/
 python scripts/05_stage2_report.py   # 2단계: 결과 요약 문서 -> 03_분석/stage2_summary.md
 python scripts/06_presentation_figures.py  # 발표용 그래프 모으기 -> 04_발표자료/figures/
-python scripts/07_slide_figures.py   # 슬라이드 전용 그림(16:9) -> 04_발표자료/figures/05~08
+python scripts/07_slide_figures.py   # 슬라이드 전용 그림(16:9, 발표 색) -> 04_발표자료/figures/05~10
+python scripts/08_build_deck.py      # 3단계: 발표 자료 초안(python-pptx) -> 04_발표자료/_build/deck_raw.pptx
+powershell -ExecutionPolicy Bypass -File scripts/09_export_deck.ps1  # PowerPoint로 글꼴 포함 PPTX + PDF 저장(Windows, PowerPoint 필요)
 ```
 
 - 시뮬레이션 설정과 가정(작업 세트, 슬롯 수, DVFS, 에이징): `scripts/config_simulation.py`
@@ -39,6 +41,7 @@ python scripts/07_slide_figures.py   # 슬라이드 전용 그림(16:9) -> 04_�
 - 배출계수: `scripts/config_emission_factors.py` (출처 주석 포함, 2026-11-06 확정)
 - 공통 설정(경로, 분석 연도, 그래프 색): `scripts/common.py`
 - 그래프: `03_분석/figures/`, 처리 로그: `03_분석/logs/`
+- 발표 자료: `04_발표자료/2026 ESD 비교과 공모전(탄소 인지 작업 스케줄링)_박수진.pptx`(git 제외, 스크립트로 재생성)와 같은 이름의 PDF. 글꼴은 Pretendard(설치 필요, PPTX에 포함 저장). 발표 대본은 `04_발표자료/slides_draft.md`에서 읽어 발표자 노트에 넣는다
 
 ## 데이터를 직접 받아야 할 때
 
