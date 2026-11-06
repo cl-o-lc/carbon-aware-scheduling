@@ -72,6 +72,22 @@ def load_curve(name: str) -> pd.DataFrame:
     return df[["date", "slot", "ci"]]
 
 
+def weekend_compare(name: str) -> dict:
+    """같은 정책 C에서 주간 작업의 주말 이동 허용(C) vs 금지(C7). 전체 실험일과 시작 요일별로."""
+    r = pd.read_csv(OUT / "stage2" / f"daily_results_{name}.csv")
+    out = {}
+    for key, sub in (("전체", r), ("평일 시작", r[r["daykind"] == "평일"]), ("주말·공휴일 시작", r[r["daykind"] == "주말·공휴일"])):
+        g = sub.groupby("policy")[["emis_g", "weekly_on_weekend"]].sum()
+        n = sub["date"].nunique()
+        out[key] = {"일수": n,
+                    "C": (1 - g.loc["C", "emis_g"] / g.loc["A", "emis_g"]) * 100,
+                    "C7": (1 - g.loc["C7", "emis_g"] / g.loc["A", "emis_g"]) * 100,
+                    "주말시작비율_C": g.loc["C", "weekly_on_weekend"] / (n * 6) * 100,
+                    "주말시작비율_C7": g.loc["C7", "weekly_on_weekend"] / (n * 6) * 100}
+    return out
+
+
+
 EPSIS_SOLAR_FILE = "EPSIS_태양광발전량추계_월별_030400.html"
 
 

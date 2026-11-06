@@ -9,7 +9,7 @@ import sys
 import pandas as pd
 
 import config_simulation as cfg
-from common import CURVES, OUT
+from common import CURVES, OUT, weekend_compare
 
 S2 = OUT / "stage2"
 
@@ -50,6 +50,7 @@ def main():
     t_main = pd.read_csv(S2 / f"annual_{main_name}.csv").set_index("정책코드")
     e0 = ex[main_name]
     w0 = e0["주말이동"]
+    wk = weekend_compare(main_name)
     dl = e0["지연"]
     rng = {n: pd.read_csv(S2 / f"annual_{n}.csv").set_index("정책코드").loc["C", "A 대비 절감률(%)"] for n in names}
     s_lo, s_hi = min(cfg.STATIC_FRAC_SENS), max(cfg.STATIC_FRAC_SENS)
@@ -61,8 +62,9 @@ def main():
           f"({CURVES[main_name][0]})."
           + (f" 시장 밖 태양광을 월별 비율로 반영하면 약 {rng['monthly']:.1f}%(가정)." if "monthly" in rng and main_name != "monthly" else ""),
           f"2. **당일 마감 작업만 보면 {e0['구분별']['당일']['C']:.1f}%.** 8~14시 마감 안에서만 움직일 수 있고 슬롯 2개를 나눠 써서, 한낮을 다 쓰지 못한다.",
-          f"3. **주말 이동이 절감의 대부분이다.** 평일 시작 실험에서 주간 작업의 주말 이동을 막으면 {w0['A 대비 C7 절감률(%)']:.1f}%, "
-          f"허용하면 {w0['A 대비 C 절감률(%)']:.1f}% (+{w0['주말 이동 추가 절감(%p, 전체 배출 기준)']:.1f}%p).",
+          f"3. **주말 이동이 절감의 대부분이다.** 같은 정책 C에서 주간 작업이 주말까지 기다리지 못하게 막으면(C7) {wk['전체']['C7']:.1f}%, "
+          f"허용하면 {wk['전체']['C']:.1f}%(= 헤드라인 C). 전체 {wk['전체']['일수']}일 기준. 평일에 시작한 {wk['평일 시작']['일수']}일만 보면 "
+          f"{wk['평일 시작']['C7']:.1f}% → {wk['평일 시작']['C']:.1f}%.",
           f"4. **현재 관행 대비(곡선 기준):** 심야 2시에서 한낮(10~14시)으로 옮기면 연간 {e0['곡선_연간']['심야→한낮 절감률(%)']:.1f}%, "
           f"봄 {e0['곡선_봄']['심야→한낮 절감률(%)']:.1f}%, 겨울 {e0['곡선_겨울']['심야→한낮 절감률(%)']:.1f}%. 저녁에서 옮길 때({e0['곡선_연간']['저녁→한낮 절감률(%)']:.1f}%)보다 작다.",
           f"5. **마감 위반 0건은 에이징이 아니라 15분마다 수행하는 EDF 가능성 검사(schedulability test) 덕분이다.** "
@@ -71,8 +73,8 @@ def main():
           f"({e0['예측']['C 절감률(%)']:.1f}% → {e0['예측']['E 절감률(%)']:.1f}%).",
           f"7. **기다리는 시간:** 당일 작업의 완료 지연은 중앙값 {dl['C']['당일']['중앙값']:.1f}시간(A는 {dl['A']['당일']['중앙값']:.1f}시간), "
           f"주간 작업은 중앙값 {dl['C']['주간']['중앙값']:.1f}시간. 전체 평균 지연이 큰 것은 주간 작업이 주말을 기다리기 때문이다(2-1절).",
-          f"8. **DVFS(D)는 모델 가정에 따라 {dlo:.0f}~{dhi:.0f}%** (정적 전력 비율 {s_hi}~{s_lo}), 근거 있는 기준값 {cfg.STATIC_FRAC}에서 "
-          f"{t_main.loc['D', 'A 대비 절감률(%)']:.1f}%. 6장 참고.",
+          f"8. **DVFS를 더하면(D) A 대비 전체 절감이 모델 가정에 따라 {dlo:.0f}~{dhi:.0f}%로 커진다** (정적 전력 비율 {s_hi}~{s_lo}, 스케줄링 효과 포함), "
+          f"근거 있는 기준값 {cfg.STATIC_FRAC}에서 {t_main.loc['D', 'A 대비 절감률(%)']:.1f}%. 6장 참고.",
           "",
           "외부 연구와 비교: Wiesner et al.(Middleware '21)도 \"shifting workloads whose results are not needed by the next working day can already reduce emissions by over 5 % across all regions\", "
           "\"shifting delay-tolerant workloads towards weekends can result in more than 20 % savings in most regions\"라고 보고했다(references.md 4-4). "
@@ -140,12 +142,17 @@ def main():
 
     # 주말 이동
     w = e["주말이동"]
-    L += ["## 4. 평일 작업을 주말로 미루는 효과", "",
-          f"평일에 시작한 실험 {w['평일 실험 일수']}일만 비교. C7은 주간 작업도 다음 날 14시까지만 미룰 수 있게 막은 C.", "",
-          f"- A 대비 절감률: C7(주말 이동 없음) {w['A 대비 C7 절감률(%)']:.1f}% → C(주말 이동 허용) {w['A 대비 C 절감률(%)']:.1f}%",
-          f"- 주말 이동으로 늘어난 절감: **{w['주말 이동 추가 절감(%p, 전체 배출 기준)']:.1f}%p** (작업 30개 전체 배출 기준)",
-          f"- 주간 작업 6개만 보면 C7 대비 C가 {w['주간 작업만: C7 대비 C 절감률(%)']:.1f}% 덜 배출",
-          f"- C에서 주간 작업이 주말·공휴일에 시작한 비율: {w['C에서 주말·공휴일에 시작한 주간 작업 비율(%)']:.1f}%", ""]
+    wk = weekend_compare(main_name)
+    L += ["## 4. 주간 작업을 주말까지 미루는 효과", "",
+          "두 경우 모두 같은 정책 C다. C7은 주간 작업도 다음 날 14시까지만 미룰 수 있게 막은 것이고, C(헤드라인)는 7일 뒤 마감까지 미룰 수 있다.", "",
+          "| 실험일 | 일수 | 주말 이동 금지(C7) | 허용(C) | 차이 | 주간 작업이 주말·공휴일에 시작한 비율(C7 → C) |",
+          "|---|---|---|---|---|---|"]
+    for key in ("전체", "평일 시작", "주말·공휴일 시작"):
+        v = wk[key]
+        L.append(f"| {key}{' (헤드라인과 같은 기준)' if key == '전체' else ''} | {v['일수']} | {v['C7']:.1f}% | {v['C']:.1f}% | "
+                 f"+{v['C'] - v['C7']:.1f}%p | {v['주말시작비율_C7']:.1f}% → {v['주말시작비율_C']:.1f}% |")
+    L += ["", f"- 평일 시작 실험에서 주간 작업 6개만 보면 C가 C7보다 {w['주간 작업만: C7 대비 C 절감률(%)']:.1f}% 덜 배출한다.",
+          "- 주말·공휴일에 시작한 실험은 C7도 다음 날(주말)까지는 미룰 수 있어 차이가 작다.", ""]
 
     # 계절·요일
     L += ["## 5. 계절별, 실험 시작일 요일별 A 대비 절감률", "", "| 구분 | B | C | D |", "|---|---|---|---|"]
