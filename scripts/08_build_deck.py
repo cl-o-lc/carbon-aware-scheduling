@@ -427,8 +427,8 @@ def build():
     bullets(s, COL_X - 0.35, 1.95, COL_W + 0.35, 4.6, [
         f"전력거래소 2025년 시간별 거래량: 연료원 {N['fuels_2025']}종, {N['rows_2025']}행 (2023년으로 비교)",
         "시간별 탄소집약도 = Σ(거래량 × 배출계수) ÷ Σ거래량",
-        [(f"표에 없는 연료원(거래량의 {N['assumed_share']:.2f}%)은 대체값(가정). ±50% 바꿔도 곡선 모양 상관계수 "
-          f"{min(N['corr']):.3f} 이상", False)]], size=18)
+        [(f"표에 없는 연료원(거래량의 {N['assumed_share']:.2f}%)은 대체값(가정). ±50% 바꿔도 곡선 모양 일치도 "
+          f"{int(min(N['corr']) * 100)}% 이상(상관계수)", False)]], size=18)
     footnote(s, "자료: 공공데이터포털 한국전력거래소_연료원별 시간대별 설비용량 및 전력거래량, IPCC AR5 WG3 Annex III 생애주기 배출계수 중앙값")
 
     # 4 하루 곡선
@@ -502,15 +502,18 @@ def build():
         k, lo, hi = jb[c]
         hrs = lambda v: (f"{v:.2f}".rstrip("0") + "0") if f"{v:.2f}".rstrip("0").endswith(".") else f"{v:.2f}".rstrip("0")
         rows.append((c, f"{k}개", dl[c], f"{hrs(lo)}~{hrs(hi)}시간", ex[c]))
-    table(s, 0.6, 1.9, [1.7, 1.1, 2.5, 2.3, 4.5], rows, row_h=0.48, name="job_table")
+    table(s, 0.6, 1.85, [1.7, 1.1, 2.5, 2.3, 4.5], rows, row_h=0.45, name="job_table")
+    text_box(s, 0.6, 3.72, 12.1, 0.4, [[("실험 기간: ", 18, True, SDG13),
+                                        (f"앞뒤 8일씩 뺀 2025년 {N['days']}일. 같은 작업 세트가 매일 들어온다고 보고 날짜마다 따로 실험", 18, False, INK)]],
+             name="period_line")
     pol_rows = [("A 현재 관행", "새벽 2시에 모든 작업을 한꺼번에 실행"),
                 ("A' 도착 즉시", "작업이 들어오자마자 실행"),
                 ("B 탄소만 쫓기", "남은 시간 중 탄소가 가장 적은 때만 기다렸다 실행"),
                 ("C 헤드라인", "B + 15분마다 마감 가능성 검사 + 에이징"),
                 ("D C + DVFS", "C에 CPU 속도 조절(0.6·0.8·1.0배)을 더함"),
                 ("E 예측", "C를 지난주 같은 요일 곡선으로 예측해서 실행")]
-    table(s, 0.6, 4.0, [2.6, 9.5], [("정책", "어떻게 돌리나")] + pol_rows, row_h=0.4, name="policy_table")
-    footnote(s, f"가정: 같은 작업 세트가 매일 들어오고 날짜마다 독립 실험(2025년 {N['days']}일). 메모리 바운드 비율 {N['mem'][0]:.2f}~{N['mem'][1]:.2f}(CPU가 메모리를 기다리는 시간 비율), 고정 시드로 생성")
+    table(s, 0.6, 4.18, [2.6, 9.5], [("정책", "어떻게 돌리나")] + pol_rows, row_h=0.39, name="policy_table")
+    footnote(s, f"{N['days']}일(지난주 자료와 주간 마감이 2025년 안에 들어오는 날만). 메모리 바운드 비율은 가정, 같은 조건으로 다시 돌리면 같은 작업이 나오도록 생성")
 
     # 10 결과
     s, n = new()
@@ -598,8 +601,8 @@ def build():
     # 16 민감도
     s, n = new()
     header(s, "민감도 분석", "가정을 바꿔도 마감 위반은 0건이고, 바뀌는 것은 절감의 크기다", n)
-    text_box(s, 0.6, 1.85, 5.6, 0.4, [("에이징 강도 γ (C 정책)", 18, True, INK)], name="t1_title")
-    rows = [("γ", "절감률", "평균 지연", "마감 위반")]
+    text_box(s, 0.6, 1.85, 5.6, 0.4, [("에이징 강도 (C 정책)", 18, True, INK)], name="t1_title")
+    rows = [("에이징 강도", "절감률", "평균 지연", "마감 위반")]
     for g in N["gammas"]:
         key = "C" if g == N["gamma0"] else f"C(γ={g:g})"
         sv, late, dly = P[key]
@@ -613,9 +616,9 @@ def build():
     rows = [("비율", "근거", "A 대비 절감률", "C 대비 에너지")]
     for sf, src, key in ((lo, "SPECpower 중앙값", f"D(정적 {lo:.2f})"), (N["static"], "Barroso 외(2018)", "D"),
                          (hi, "Barroso·Hölzle(2007)", f"D(정적 {hi:.2f})")):
-        rows.append((f"{sf:.2f}" + (" (기준)" if key == "D" else ""), src, pct(P[key][0]), pct(de[key]["C 대비 에너지 절감률(%)"])))
+        rows.append((f"{sf:.2f}", src, pct(P[key][0]), pct(de[key]["C 대비 에너지 절감률(%)"])))
     table(s, 6.75, 2.3, [1.35, 2.55, 1.05, 1.05], rows, row_h=0.62, head_h=0.8, size=18, name="static_table", highlight=2)
-    text_box(s, 6.75, 5.2, 6.0, 0.8, [("정적 전력: CPU 속도를 낮춰도 줄지 않는 전력(메모리·디스크·팬 등). 0.21은 하한 성격의 값", 16, False, INK2)],
+    text_box(s, 6.75, 5.2, 6.0, 0.8, [(f"굵은 행이 기준값({N['static']}). 정적 전력: CPU 속도를 낮춰도 줄지 않는 전력(메모리·디스크·팬 등). 0.21은 하한 성격의 값", 16, False, INK2)],
              name="static_note")
     text_box(s, 0.6, 6.15, 12.1, 0.45, [[("민감도 분석 ", 18, True, SDG13), ("가정한 숫자를 바꿔 보며 결과가 얼마나 흔들리는지 보는 것", 18, False, INK)]],
              name="term_line")

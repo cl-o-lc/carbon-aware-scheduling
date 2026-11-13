@@ -64,7 +64,7 @@ powershell -ExecutionPolicy Bypass -File scripts/09_export_deck.ps1   # 글꼴 �
 - 완료: 데이터 수집, 탄소집약도 분석, 시뮬레이션, 발표 원고, 제출용 PPTX·PDF 19장(표지 제목 40pt, 그림 없는 표지로 확정), README
 - 남은 일
   1. 사용자가 GitHub 저장소를 public으로 전환(17장 "코드와 데이터 출처 공개" 문구의 전제)
-  2. 발표 영상 녹화(대본: `slides_draft.md` 또는 PPTX 발표자 노트, 2,233음절, 약 7.4~8.3분)
+  2. 발표 영상 녹화(대본: `slides_draft.md` 또는 PPTX 발표자 노트, 2,225음절, 약 7.4~8.2분)
   3. 참가 신청서 작성(문구: `slides_draft.md` 맨 아래)
   4. ZIP 묶기(PPT, PDF, 영상) → `99_제출/`
   5. 슈패스 제출(11/16까지)
