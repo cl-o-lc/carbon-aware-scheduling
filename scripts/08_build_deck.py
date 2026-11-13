@@ -479,6 +479,7 @@ def build():
           name="course_table")
     text_box(s, 0.6, 6.35, 12.1, 0.45, [("운영체제 개념이 설계의 뼈대, 컴퓨터구조가 전력 모델, 확률과통계가 검증을 맡았다", 18, False, INK2)],
              name="table_note")
+    footnote(s, "EDF: 마감 빠른 순 처리(8장에서 설명) · DVFS: CPU 속도·전압 조절(15장에서 설명)")
 
     # 8 설계
     s, n = new()
@@ -530,7 +531,7 @@ def build():
 
     # 11 정책별 전체 비교
     s, n = new()
-    header(s, "정책별 전체 비교", "마감을 모두 지키면서 탄소를 줄인 것은 C와 D다", n)
+    header(s, "정책별 전체 비교", "마감을 놓친 것은 B뿐이고, 마감을 지키며 많이 줄인 것은 C와 D다", n)
     P = N["pol"]
     rows = [("정책", "현재 관행 대비 절감률", "마감 위반(1년)", "평균 완료 지연")]
     for code, lab in (("A", "A 현재 관행"), ("A'", "A' 도착 즉시"), ("B", "B 탄소만 쫓기"), ("C", "C 마감 검사 + 에이징"),
@@ -538,7 +539,7 @@ def build():
         sv, late, dly = P[code]
         sv_txt = "기준" if code == "A" else pct(sv)
         if code == "D":
-            sv_txt += f" (가정에 따라 {N['D_lo']:.1f}~{N['D_hi']:.1f}%)"
+            sv_txt += f" (가정에 따라 {N['D_lo']:.0f}~{N['D_hi']:.0f}%)"
         rows.append((lab, sv_txt, f"{late:,}건", f"{dly:.1f}시간"))
     table(s, 0.6, 1.95, [3.4, 4.4, 2.0, 2.3], rows, row_h=0.56, size=19, name="policy_compare", highlight=4)
     text_box(s, 0.6, 6.0, 12.1, 0.45, [("평균 완료 지연에는 주말까지 기다린 주간 작업이 들어 있다(12장)", 18, False, INK2)],
@@ -596,7 +597,7 @@ def build():
         "메모리를 기다리는 작업은 속도를 0.6으로 낮춰도 실행 시간이 약 1.13배",
         f"헤드라인은 스케줄링만의 {N['C']:.1f}%로 둔다"])
     term_card(s, COL_X, 5.05, COL_W, 1.4, [("DVFS ", "급하지 않을 때 CPU 속도·전압을 낮춰 전기를 아끼는 기술")])
-    footnote(s, f"정적 전력 비율 가정 {N['s_lo']}~{N['s_hi']}(기본 {N['static']}): SPECpower 2023~2026년 결과 중앙값, Barroso 외(2018, 2007). 메모리 바운드 비율 0.8 기준")
+    footnote(s, f"전체 절감 {N['D_lo']:.0f}~{N['D_hi']:.0f}%(기본 {N['D']:.0f}%)는 정적 전력 비율 가정 {N['s_hi']}~{N['s_lo']}(기본 {N['static']})에 따른 범위. 근거: SPECpower 중앙값, Barroso 외(2018, 2007)")
 
     # 16 민감도
     s, n = new()
@@ -622,7 +623,7 @@ def build():
              name="static_note")
     text_box(s, 0.6, 6.15, 12.1, 0.45, [[("민감도 분석 ", 18, True, SDG13), ("가정한 숫자를 바꿔 보며 결과가 얼마나 흔들리는지 보는 것", 18, False, INK)]],
              name="term_line")
-    footnote(s, f"2025년 {N['days']}일 합계, 전력시장 거래량 기준. 정적 전력 근거는 references.md 6장")
+    footnote(s, f"2025년 {N['days']}일 합계, 전력시장 거래량 기준. 정적 전력 근거: SPECpower(2023~2026) 중앙값, Barroso 외(2018), Barroso·Hölzle(2007)")
 
     # 17 SDG
     s, n = new()
@@ -660,7 +661,7 @@ def build():
     text_box(s, 0.9, 5.1, 11.5, 1.15, [[("평균 배출계수  ", 18, True, SDG7),
                                         ("그 시각에 돌던 발전기 전체의 평균 탄소. 작업 하나 때문에 실제로 더 돌거나 덜 도는 발전기(한계 발전기)의 탄소와는 다를 수 있다", 18, False, WHITE)]],
              anchor=MSO_ANCHOR.MIDDLE, name="term_text")
-    footnote(s, "근거: 03_분석/summary_stage1.md 6장, 03_분석/stage2_summary.md 12장", dark=True)
+    footnote(s, f"코드·데이터 출처: {REPO_URL}", dark=True)
 
     # 19 향후 과제와 결론
     s, n = new(dark=True)

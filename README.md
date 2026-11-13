@@ -68,6 +68,7 @@ python scripts/07_slide_figures.py     # 슬라이드 전용 그림(16:9) -> 04_
 ```bash
 python scripts/08_build_deck.py        # python-pptx로 초안 -> 04_발표자료/_build/deck_raw.pptx
 powershell -ExecutionPolicy Bypass -File scripts/09_export_deck.ps1   # 글꼴 포함 PPTX + PDF
+python scripts/10_export_script.py     # 발표 대본만 뽑기 -> 04_발표자료/대본.md
 ```
 
 표지의 소속·학번·이름은 `04_발표자료/author.local.txt`(저장소에 넣지 않음) 한 줄에서 읽고, 파일이 없으면 이름만 넣습니다. 발표 대본은 `04_발표자료/slides_draft.md`에서 읽어 발표자 노트에 넣습니다.
