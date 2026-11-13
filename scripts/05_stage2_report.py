@@ -184,6 +184,14 @@ def main():
           f"- 완전 정보 가정을 풀면 절감률이 {p['차이(%p)']:.1f}%p 줄어든다: C(실제 곡선을 미리 안다고 가정) {p['C 절감률(%)']:.1f}% → "
           f"E(전주 같은 요일 같은 시각 값으로 예측) {p['E 절감률(%)']:.1f}%.",
           "- 확률과통계 연결: 예측값은 '지난주 같은 요일 같은 시각'이라는 가장 단순한 추정이다. 계절 평균, 이동평균, 일기예보(일사량) 같은 정보를 더하면 차이를 줄일 여지가 있다.", ""]
+    dr = pd.read_csv(S2 / f"daily_results_{main_name}.csv")
+    base_d = dr[dr["policy"] == "A"].set_index("date")["emis_g"]
+    L += ["날짜별로 보면(현재 관행 A 대비 절감률):", "",
+          "| 정책 | 날짜별 절감률 중앙값 | 가장 나쁜 날 | A보다 배출이 늘어난 날 |", "|---|---|---|---|"]
+    for pol in ("C", "E"):
+        sav = (1 - dr[dr["policy"] == pol].set_index("date")["emis_g"] / base_d) * 100
+        L.append(f"| {POL.get(pol, pol)} | {sav.median():.1f}% | {sav.min():.1f}% | {int((sav < 0).sum())}일 / {len(sav)}일 |")
+    L.append("")
 
     # 에이징 민감도
     L += ["## 8. 에이징 강도(γ) 민감도", "",

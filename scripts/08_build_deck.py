@@ -308,11 +308,75 @@ def build_cover_option():
     print(out)
 
 
+def more_numbers(N: dict) -> dict:
+    """19장 구성에서 새로 쓰는 숫자. 모두 분석 출력 파일에서 읽는다."""
+    import config_simulation as cfg
+    name = main_curve()
+    prof = (ROOT / "02_데이터" / "raw_profile.md").read_text(encoding="utf-8")
+    sec = prof[prof.index("설비용량 및 전력거래량_20251231.csv"):]
+    sec = sec[: sec.index("\n## ")]
+    N["rows_2025"] = re.search(r"행 수\(헤더 제외\): ([\d,]+)", sec).group(1)
+    N["fuels_2025"] = int(re.search(r"`연료원별` 구분 값\((\d+)개\)", sec).group(1))
+    N["share"] = {k: float(v) for k, v in re.findall(r"- (\S+): [\d,]+ MWh \(([\d.]+)%\)", sec)}
+    log = (OUT / "logs" / "02_carbon_intensity.log").read_text(encoding="utf-8")
+    N["assumed_share"] = float(re.search(r"2025년 가정 항목.*?비중: ([\d.]+)%", log).group(1))
+    sens = pd.read_csv(OUT / "sensitivity_assumed_factors.csv").set_index("케이스")
+    N["corr"] = [sens.loc[k, "곡선모양 상관계수"] for k in ("가정 항목 전체 -50%", "가정 항목 전체 +50%")]
+    m25 = json.loads((OUT / "ci_summary.json").read_text(encoding="utf-8"))["metrics"]["2025"]
+    N["season"] = {k: m25[k]["평균"] for k in ("봄", "여름", "가을", "겨울")}
+    N["save6"] = {k: m25[k]["절감률_더러운6h→깨끗6h"] * 100 for k in ("봄", "평일", "주말·공휴일")}
+    jobs = pd.read_csv(OUT / "stage2" / "jobs.csv")
+    N["jobs"] = {c: (len(g), g["runtime"].min(), g["runtime"].max()) for c, g in jobs.groupby("cls")}
+    N["mem"] = (jobs["mem"].min(), jobs["mem"].max())
+    t = pd.read_csv(OUT / "stage2" / f"annual_{name}.csv").set_index("정책코드")
+    N["pol"] = {p: (t.loc[p, "A 대비 절감률(%)"], int(t.loc[p, "late"]), t.loc[p, "delay_h"]) for p in t.index}
+    e = json.loads((OUT / "stage2" / "stage2_results.json").read_text(encoding="utf-8"))["extras"][name]
+    N["delay"] = e["지연"]
+    N["dvfs_energy"] = e["DVFS 에너지"]
+    dr = pd.read_csv(OUT / "stage2" / f"daily_results_{name}.csv")
+    base = dr[dr["policy"] == "A"].set_index("date")["emis_g"]
+    N["daily"] = {}
+    for p in ("C", "E"):
+        sav = (1 - dr[dr["policy"] == p].set_index("date")["emis_g"] / base) * 100
+        N["daily"][p] = (sav.median(), int((sav < 0).sum()), len(sav))
+    N["gammas"] = cfg.AGING_GAMMA_SENS
+    N["gamma0"] = cfg.AGING_GAMMA
+    return N
+
+
+def table(s, x, y, widths, rows, row_h=0.5, size=18, name="table", highlight=None, head_h=None):
+    """첫 행은 머리글(진한 배경), 첫 열은 연한 초록. highlight 행은 굵게 강조."""
+    shp = s.shapes.add_table(len(rows), len(widths), Inches(x), Inches(y), Inches(sum(widths)),
+                             Inches(row_h * len(rows)))
+    shp.name = name
+    tbl = shp.table
+    for j, w in enumerate(widths):
+        tbl.columns[j].width = Inches(w)
+    for i, row in enumerate(rows):
+        tbl.rows[i].height = Inches(head_h if (i == 0 and head_h) else row_h)
+        for j, val in enumerate(row):
+            cell = tbl.cell(i, j)
+            hl = highlight is not None and i == highlight
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = rgb(INK if i == 0 else (LIGHT if (j == 0 or hl) else WHITE))
+            cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+            cell.margin_left = cell.margin_right = Inches(0.12)
+            cell.margin_top = cell.margin_bottom = Inches(0.03)
+            p = cell.text_frame.paragraphs[0]
+            p.text = ""
+            no_word_split(p)
+            r = p.add_run()
+            r.text = str(val)
+            style_run(r, size, i == 0 or j == 0 or hl, WHITE if i == 0 else (SDG13 if j == 0 else INK))
+    return tbl
+
+
 def build():
-    N = numbers()
+    N = more_numbers(numbers())
     notes = scripts_from_draft()
-    if len(notes) != 11:
-        raise SystemExit(f"[중단] 원고의 대본 블록이 11개가 아님: {len(notes)}")
+    TOTAL = 19
+    if len(notes) != TOTAL:
+        raise SystemExit(f"[중단] 원고의 대본 블록이 {TOTAL}개가 아님: {len(notes)}")
     prs = Presentation()
     prs.slide_width, prs.slide_height = Inches(SW), Inches(SH)
     blank = prs.slide_layouts[6]
@@ -322,15 +386,17 @@ def build():
         s = prs.slides.add_slide(blank)
         background(s, INK if dark else WHITE)
         slides.append(s)
-        return s
+        return s, len(slides)
+
+    pct = lambda v, d=1: f"{v:.{d}f}%"
 
     # 1 표지
-    s = new(dark=True)
+    s, n = new(dark=True)
     cover(s)
 
     # 2 문제
-    s = new()
-    header(s, "데이터센터 전기 사용이 빠르게 늘고 있다", "AI 시대, 데이터센터가 쓰는 전기가 몇 년 안에 두 배가 된다", 2)
+    s, n = new()
+    header(s, "데이터센터 전기 사용이 빠르게 늘고 있다", "AI 시대, 데이터센터가 쓰는 전기가 몇 년 안에 두 배가 된다", n)
     cards = [("415 TWh", "2024년 전 세계 데이터센터 전력\n세계 전력의 약 1.5%", INK),
              ("945 TWh", "2030년 전망, 두 배 이상\n일본 한 나라 소비보다 조금 많음", SDG9),
              ("6.2 GW", "2038년 한국 데이터센터 전력수요 전망\n(2022년 말 147개, 1,762 MW)", SDG13)]
@@ -348,9 +414,26 @@ def build():
              name="term_line")
     footnote(s, "자료: IEA(2025) Energy and AI, p.14 / 산업통상자원부(2025) 제11차 전력수급기본계획 / 산업통상자원부(2023) 데이터센터 수도권 집중 완화 방안")
 
-    # 3 탄소 곡선
-    s = new()
-    header(s, "한국 전기는 한낮에 가장 깨끗하고, 저녁에 가장 더럽다", "같은 1kWh라도 몇 시에 쓰느냐에 따라 탄소가 다르다", 3)
+    # 3 데이터와 계산 방법
+    s, n = new()
+    header(s, "데이터와 계산 방법", "공개 데이터와 국제 배출계수로 시간마다 전기의 탄소를 계산했다", n)
+    sh = N["share"]
+    fuel_rows = [("연료원", "2025 거래량 비중", "배출계수 (g/kWh)", "출처")]
+    for k, f in (("원자력", 12), ("유연탄", 820), ("LNG", 490), ("태양광", 48), ("바이오매스", 230), ("풍력", 11)):
+        fuel_rows.append((k, pct(sh[k]), f, "IPCC AR5"))
+    table(s, 0.6, 1.95, [1.9, 2.2, 2.1, 1.6], fuel_rows, row_h=0.52, name="fuel_table")
+    text_box(s, 0.6, 5.7, 7.8, 0.4, [("배출계수: 전기 1kWh를 만들 때 건설부터 폐기까지 생애 전체에서 나오는 온실가스", 16, False, INK2)],
+             name="table_caption")
+    bullets(s, COL_X - 0.35, 1.95, COL_W + 0.35, 4.6, [
+        f"전력거래소 2025년 시간별 거래량: 연료원 {N['fuels_2025']}종, {N['rows_2025']}행 (2023년으로 비교)",
+        "시간별 탄소집약도 = Σ(거래량 × 배출계수) ÷ Σ거래량",
+        [(f"표에 없는 연료원(거래량의 {N['assumed_share']:.2f}%)은 대체값(가정). ±50% 바꿔도 곡선 모양 상관계수 "
+          f"{min(N['corr']):.3f} 이상", False)]], size=18)
+    footnote(s, "자료: 공공데이터포털 한국전력거래소_연료원별 시간대별 설비용량 및 전력거래량, IPCC AR5 WG3 Annex III 생애주기 배출계수 중앙값")
+
+    # 4 하루 곡선
+    s, n = new()
+    header(s, "한국 전기는 한낮에 가장 깨끗하고, 저녁에 가장 더럽다", "같은 1kWh라도 몇 시에 쓰느냐에 따라 탄소가 다르다", n)
     picture(s, FIGS / "09_슬라이드3_탄소곡선_히트맵.png", FIG_X, FIG_Y, FIG_W, "figure")
     bullets(s, COL_X, 1.95, COL_W, 3.2, [
         [(f"{N['ci_min_h']}~{N['ci_min_h'] + 1}시", True), (f"가 가장 깨끗 ({N['ci_min']:.0f}{NB}g/kWh)", False)],
@@ -359,9 +442,23 @@ def build():
     term_card(s, COL_X, 5.0, COL_W, 1.45, [("탄소집약도 ", "전기 1kWh를 만들 때 나오는 온실가스(g)")])
     footnote(s, "자료: 전력거래소 연료원별 시간대별 전력거래량(2025·2023년), IPCC AR5 생애주기 배출계수. 2025년 평균, g = gCO2eq")
 
-    # 4 아이디어
-    s = new()
-    header(s, "아이디어: 빨래는 해 좋은 한낮에 널듯이", "미뤄도 되는 컴퓨터 일은 태양광이 많은 한낮에", 4)
+    # 5 계절·주말
+    s, n = new()
+    header(s, "계절과 요일에 따라서도 다르다", "봄이 가장 깨끗하고, 주말·공휴일은 평일보다 깨끗하다", n)
+    picture(s, FIGS / "12_슬라이드5_계절별_곡선.png", FIG_X, FIG_Y, FIG_W, "figure")
+    se = N["season"]
+    text_box(s, COL_X, 1.9, COL_W, 1.3, [[("평일 ", 20, False, INK), (f"{N['wd']:.1f}", 34, True, INK)],
+                                         [("주말·공휴일 ", 20, False, INK), (f"{N['we']:.1f}", 34, True, SDG13)]],
+             name="weekday_weekend")
+    bullets(s, COL_X, 3.35, COL_W, 3.2, [
+        f"봄 {se['봄']:.1f}로 가장 깨끗, 여름 {se['여름']:.1f}로 가장 높다. 네 계절 모두 12~13시가 최저",
+        f"더러운 6시간 → 깨끗한 6시간 절감률: 봄{NB}{pct(N['save6']['봄'])}, 주말·공휴일{NB}{pct(N['save6']['주말·공휴일'])}, 평일{NB}{pct(N['save6']['평일'])}"],
+        size=18)
+    footnote(s, "단위 gCO2eq/kWh, 2025년 평균, 전력시장 거래량 기준. 주말·공휴일은 토·일과 법정 공휴일")
+
+    # 6 아이디어
+    s, n = new()
+    header(s, "아이디어: 빨래는 해 좋은 한낮에 널듯이", "미뤄도 되는 컴퓨터 일은 태양광이 많은 한낮에", n)
     picture(s, FIGS / "05_탄소곡선_요금시간대.png", FIG_X, FIG_Y, FIG_W, "figure")
     bullets(s, COL_X, 1.95, COL_W, 3.3, [
         "백업·통계·모델 학습처럼 급하지 않은 일은 마감 안에서 옮길 수 있다",
@@ -371,37 +468,21 @@ def build():
                                            ("출력제어 ", "남는 태양광 발전을 멈추는 것")])
     footnote(s, "자료: 한전 기본공급약관 별표3, 기후에너지환경부·정책브리핑(2026.3.13, 4.14) 계절·시간대별 요금 개편")
 
-    # 5 과목 매핑
-    s = new()
-    header(s, "이번 학기 전공 수업으로 풀었다", "과목별로 배운 개념이 스케줄러의 각 부분이 되었다", 5)
-    rows = [("과목", "배운 개념", "이 프로젝트에서의 적용"),
-            ("운영체제", "EDF·에이징·가능성 검사", "탄소 인지 스케줄러"),
-            ("컴퓨터구조", "P ∝ CV²f, DVFS", "주파수별 에너지 모델"),
-            ("클라우드네트워킹", "가상화·작업 이동", "시간 이동 구현"),
-            ("확률과통계", "분포·예측", "예측 오차 3%p 측정")]
-    tbl = s.shapes.add_table(len(rows), 3, Inches(0.6), Inches(1.95), Inches(12.1), Inches(4.2)).table
-    for j, wdt in enumerate((3.2, 4.5, 4.4)):
-        tbl.columns[j].width = Inches(wdt)
-    for i, row in enumerate(rows):
-        tbl.rows[i].height = Inches(0.84)
-        for j, val in enumerate(row):
-            cell = tbl.cell(i, j)
-            cell.fill.solid()
-            cell.fill.fore_color.rgb = rgb(INK if i == 0 else (LIGHT if j == 0 else WHITE))
-            cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-            cell.margin_left = Inches(0.25)
-            tf = cell.text_frame
-            tf.paragraphs[0].text = ""
-            no_word_split(tf.paragraphs[0])
-            r = tf.paragraphs[0].add_run()
-            r.text = val
-            style_run(r, 22 if i else 20, i == 0 or j == 0, WHITE if i == 0 else (SDG13 if j == 0 else INK))
+    # 7 전공 연계
+    s, n = new()
+    header(s, "이번 학기 전공 수업으로 풀었다", "과목별로 배운 개념이 스케줄러의 각 부분이 되었다", n)
+    table(s, 0.6, 1.95, [3.2, 4.5, 4.4], [("과목", "배운 개념", "이 프로젝트에서의 적용"),
+                                          ("운영체제", "EDF·에이징·가능성 검사", "탄소 인지 스케줄러"),
+                                          ("컴퓨터구조", "P ∝ CV²f, DVFS", "주파수별 에너지 모델"),
+                                          ("클라우드네트워킹", "가상화·작업 이동", "시간 이동 구현"),
+                                          ("확률과통계", "분포·예측", "예측 오차 3%p 측정")], row_h=0.84, size=22,
+          name="course_table")
     text_box(s, 0.6, 6.35, 12.1, 0.45, [("운영체제 개념이 설계의 뼈대, 컴퓨터구조가 전력 모델, 확률과통계가 검증을 맡았다", 18, False, INK2)],
              name="table_note")
 
-    # 6 설계
-    s = new()
-    header(s, "스케줄러 설계: 탄소는 아끼고, 마감은 지킨다", "탄소만 쫓으면 마감을 놓친다. 그래서 15분마다 마감을 검사한다", 6)
+    # 8 설계
+    s, n = new()
+    header(s, "스케줄러 설계: 탄소는 아끼고, 마감은 지킨다", "탄소만 쫓으면 마감을 놓친다. 그래서 15분마다 마감을 검사한다", n)
     flowchart(s)
     bullets(s, COL_X, 1.95, COL_W, 3.4, [
         "탄소 비용 = 전력 × 시간 × 그 시간의 탄소집약도",
@@ -410,9 +491,30 @@ def build():
     term_card(s, COL_X, 5.3, COL_W, 1.15, [("EDF ", "마감이 빠른 작업부터 처리하는 방식")])
     footnote(s, "가능성 검사(schedulability test): 지금 아무것도 안 돌려도 모든 작업을 마감 안에 끝낼 수 있는지 미리 따지는 것")
 
-    # 7 결과
-    s = new()
-    header(s, f"결과: 스케줄링만으로 {N['C']:.1f}%", f"새벽 2시 일괄 실행보다 연간 {N['C']:.1f}% 적은 탄소, 마감 위반 0건", 7)
+    # 9 시뮬레이션 설정
+    s, n = new()
+    header(s, "시뮬레이션 설정", "가상의 대학 서버(동시 실행 2개)에 하루 30개 작업을 넣고 여섯 방법을 비교했다", n)
+    jb = N["jobs"]
+    ex = {"당일": "웹 로그 집계, 성적 통계", "익일": "강의 영상 인코딩", "주간": "전체 백업, 모델 재학습"}
+    dl = {"당일": "당일 8~14시", "익일": "다음 날 8~14시", "주간": "7일 뒤 8~14시"}
+    rows = [("마감 구분", "개수", "마감", "실행 시간", "예")]
+    for c in ("당일", "익일", "주간"):
+        k, lo, hi = jb[c]
+        hrs = lambda v: (f"{v:.2f}".rstrip("0") + "0") if f"{v:.2f}".rstrip("0").endswith(".") else f"{v:.2f}".rstrip("0")
+        rows.append((c, f"{k}개", dl[c], f"{hrs(lo)}~{hrs(hi)}시간", ex[c]))
+    table(s, 0.6, 1.9, [1.7, 1.1, 2.5, 2.3, 4.5], rows, row_h=0.48, name="job_table")
+    pol_rows = [("A 현재 관행", "새벽 2시에 모든 작업을 한꺼번에 실행"),
+                ("A' 도착 즉시", "작업이 들어오자마자 실행"),
+                ("B 탄소만 쫓기", "남은 시간 중 탄소가 가장 적은 때만 기다렸다 실행"),
+                ("C 헤드라인", "B + 15분마다 마감 가능성 검사 + 에이징"),
+                ("D C + DVFS", "C에 CPU 속도 조절(0.6·0.8·1.0배)을 더함"),
+                ("E 예측", "C를 지난주 같은 요일 곡선으로 예측해서 실행")]
+    table(s, 0.6, 4.0, [2.6, 9.5], [("정책", "어떻게 돌리나")] + pol_rows, row_h=0.4, name="policy_table")
+    footnote(s, f"가정: 같은 작업 세트가 매일 들어오고 날짜마다 독립 실험(2025년 {N['days']}일). 메모리 바운드 비율 {N['mem'][0]:.2f}~{N['mem'][1]:.2f}(CPU가 메모리를 기다리는 시간 비율), 고정 시드로 생성")
+
+    # 10 결과
+    s, n = new()
+    header(s, f"결과: 스케줄링만으로 {N['C']:.1f}%", f"새벽 2시 일괄 실행보다 연간 {N['C']:.1f}% 적은 탄소, 마감 위반 0건", n)
     picture(s, FIGS / "10_슬라이드7_간트_A_vs_C.png", FIG_X, FIG_Y, FIG_W, "figure")
     text_box(s, COL_X, 1.85, COL_W, 1.0, [(f"{N['C']:.1f}%", 60, True, SDG13)], name="big_number")
     text_box(s, COL_X, 2.9, COL_W, 0.4, [("연간 탄소 절감 · 마감 위반 0건", 18, True, INK)], name="big_number_label")
@@ -423,9 +525,42 @@ def build():
              name="range_note")
     footnote(s, f"가상 대학 서버 작업 30개 × 2025년 {N['days']}일 시뮬레이션, 전력시장 거래량 기준 탄소 곡선. 심야→한낮은 곡선 값 기준")
 
-    # 8 핵심 발견
-    s = new()
-    header(s, "핵심 발견: 얼마나 기다릴 수 있느냐가 절감을 정한다", "마감 유연성이 절감을 결정한다", 8)
+    # 11 정책별 전체 비교
+    s, n = new()
+    header(s, "정책별 전체 비교", "마감을 모두 지키면서 탄소를 줄인 것은 C와 D다", n)
+    P = N["pol"]
+    rows = [("정책", "현재 관행 대비 절감률", "마감 위반(1년)", "평균 완료 지연")]
+    for code, lab in (("A", "A 현재 관행"), ("A'", "A' 도착 즉시"), ("B", "B 탄소만 쫓기"), ("C", "C 마감 검사 + 에이징"),
+                      ("D", "D C + DVFS"), ("E", "E C + 지난주 예측")):
+        sv, late, dly = P[code]
+        sv_txt = "기준" if code == "A" else pct(sv)
+        if code == "D":
+            sv_txt += f" (가정에 따라 {N['D_lo']:.1f}~{N['D_hi']:.1f}%)"
+        rows.append((lab, sv_txt, f"{late:,}건", f"{dly:.1f}시간"))
+    table(s, 0.6, 1.95, [3.4, 4.4, 2.0, 2.3], rows, row_h=0.56, size=19, name="policy_compare", highlight=4)
+    text_box(s, 0.6, 6.0, 12.1, 0.45, [("평균 완료 지연에는 주말까지 기다린 주간 작업이 들어 있다(12장)", 18, False, INK2)],
+             name="table_note")
+    footnote(s, f"2025년 {N['days']}일 합계, 전력시장 거래량 기준. D는 정적 전력 비율 0.33 기준(범위는 0.5~0.21 가정)")
+
+    # 12 기다리는 대가
+    s, n = new()
+    header(s, "기다리는 대가", "당일 작업은 약 3시간 늦게 끝나지만, 모두 마감 안이다", n)
+    d = N["delay"]
+    rows = [("마감 구분", "A 평균", "A 중앙값", "C 평균", "C 중앙값")]
+    for c in ("당일", "익일", "주간"):
+        rows.append((c, f"{d['A'][c]['평균']:.1f}", f"{d['A'][c]['중앙값']:.1f}", f"{d['C'][c]['평균']:.1f}", f"{d['C'][c]['중앙값']:.1f}"))
+    table(s, 0.6, 1.95, [2.0, 1.55, 1.55, 1.55, 1.55], rows, row_h=0.85, size=22, name="delay_table")
+    text_box(s, 0.6, 5.5, 8.2, 0.4, [("단위: 시간. A 현재 관행, C 탄소 인지 스케줄링", 16, False, INK2)], name="table_caption")
+    bullets(s, COL_X, 1.95, COL_W, 3.1, [
+        [("당일 작업: 중앙값 ", False), (f"{d['A']['당일']['중앙값']:.1f}{NB}→{NB}{d['C']['당일']['중앙값']:.1f}시간", True)],
+        "주간 작업이 오래 기다리는 것은 주말까지 미뤘기 때문",
+        "세 구분 모두 마감은 지켰다"])
+    term_card(s, COL_X, 5.0, COL_W, 1.45, [("완료 지연 ", "끝난 시각 - 도착 시각 - 실행 시간")])
+    footnote(s, f"2025년 {N['days']}일의 모든 작업을 모아 계산, 전력시장 거래량 기준. 마감: 당일 8~14시, 익일 다음 날 8~14시, 주간 7일 뒤 8~14시")
+
+    # 13 핵심 발견
+    s, n = new()
+    header(s, "핵심 발견: 얼마나 기다릴 수 있느냐가 절감을 정한다", "마감 유연성이 절감을 결정한다", n)
     picture(s, FIGS / "07_주말이동_비교.png", FIG_X, FIG_Y, FIG_W, "figure")
     bullets(s, COL_X, 1.95, COL_W, 4.6, [
         f"당일 마감 작업만 보면 {N['same_day']:.1f}%",
@@ -436,9 +571,21 @@ def build():
              name="external_note")
     footnote(s, "자료: Wiesner et al.(2021) Let's Wait Awhile, Middleware '21. 같은 스케줄러(C)에서 주간 작업의 마감만 바꿔 비교")
 
-    # 9 DVFS
-    s = new()
-    header(s, "더 줄일 수 있을까: 필요 이상으로 빠르게 돌리지 않기", "CPU 속도를 조금 낮추면 전체 절감이 커지지만, 크기는 가정에 달렸다", 9)
+    # 14 예측
+    s, n = new()
+    header(s, "예측으로 돌렸을 때", f"내일 곡선을 모르고 지난주 값으로 예측해도 {N['E']:.1f}%를 줄인다", n)
+    picture(s, FIGS / "13_슬라이드14_예측_분포.png", FIG_X, FIG_Y, FIG_W, "figure")
+    dC, dE = N["daily"]["C"], N["daily"]["E"]
+    bullets(s, COL_X, 1.95, COL_W, 3.3, [
+        [("완전 정보 가정을 풀면 ", False), (f"{N['E_diff']:.1f}%p 감소", True), (f" ({N['C']:.1f}%{NB}→{NB}{N['E']:.1f}%)", False)],
+        f"현재 관행보다 배출이 늘어난 날: C {dC[1]}일, E {dE[1]}일 ({dE[2]}일 중)",
+        "확률과통계 연계: 이동평균·일사량 예보로 차이를 줄일 여지(미검증)"], size=18)
+    term_card(s, COL_X, 5.0, COL_W, 1.45, [("완전 정보 가정 ", "다음 날 탄소 곡선을 미리 정확히 안다고 보는 것")])
+    footnote(s, "E: 지난주 같은 요일 같은 시각의 탄소집약도를 예측값으로 써서 스케줄링하고, 배출은 실제 곡선으로 계산")
+
+    # 15 DVFS
+    s, n = new()
+    header(s, "더 줄일 수 있을까: 필요 이상으로 빠르게 돌리지 않기", "CPU 속도를 조금 낮추면 전체 절감이 커지지만, 크기는 가정에 달렸다", n)
     picture(s, FIGS / "08_정책별_절감률_ACD.png", FIG_X, FIG_Y, FIG_W, "figure")
     bullets(s, COL_X, 1.95, COL_W, 3.2, [
         [("DVFS를 더하면 전체 절감이 ", False), (f"{N['D_lo']:.0f}~{N['D_hi']:.0f}%", True),
@@ -448,10 +595,35 @@ def build():
     term_card(s, COL_X, 5.05, COL_W, 1.4, [("DVFS ", "급하지 않을 때 CPU 속도·전압을 낮춰 전기를 아끼는 기술")])
     footnote(s, f"정적 전력 비율 가정 {N['s_lo']}~{N['s_hi']}(기본 {N['static']}): SPECpower 2023~2026년 결과 중앙값, Barroso 외(2018, 2007). 메모리 바운드 비율 0.8 기준")
 
-    # 10 SDG
-    s = new()
-    header(s, "SDG 타깃과 기대 효과", "설비를 새로 사지 않고, 운영 방식만 바꿔 기여한다", 10)
-    # 타깃 요지는 유엔 원문(references.md 7장)을 한 줄로 옮긴 것
+    # 16 민감도
+    s, n = new()
+    header(s, "민감도 분석", "가정을 바꿔도 마감 위반은 0건이고, 바뀌는 것은 절감의 크기다", n)
+    text_box(s, 0.6, 1.85, 5.6, 0.4, [("에이징 강도 γ (C 정책)", 18, True, INK)], name="t1_title")
+    rows = [("γ", "절감률", "평균 지연", "마감 위반")]
+    for g in N["gammas"]:
+        key = "C" if g == N["gamma0"] else f"C(γ={g:g})"
+        sv, late, dly = P[key]
+        lab = "에이징 없음" if g == float("inf") else (f"{g:g} (기준)" if g == N["gamma0"] else f"{g:g}")
+        rows.append((lab, pct(sv), f"{dly:.1f}시간", f"{late}건"))
+    table(s, 0.6, 2.3, [1.8, 1.25, 1.5, 1.25], rows, row_h=0.5, name="gamma_table",
+          highlight=1 + list(N["gammas"]).index(N["gamma0"]))
+    text_box(s, 6.75, 1.85, 6.0, 0.4, [("정적 전력 비율 (D 정책)", 18, True, INK)], name="t2_title")
+    de = N["dvfs_energy"]
+    lo, hi = N["s_lo"], N["s_hi"]
+    rows = [("비율", "근거", "A 대비 절감률", "C 대비 에너지")]
+    for sf, src, key in ((lo, "SPECpower 중앙값", f"D(정적 {lo:.2f})"), (N["static"], "Barroso 외(2018)", "D"),
+                         (hi, "Barroso·Hölzle(2007)", f"D(정적 {hi:.2f})")):
+        rows.append((f"{sf:.2f}" + (" (기준)" if key == "D" else ""), src, pct(P[key][0]), pct(de[key]["C 대비 에너지 절감률(%)"])))
+    table(s, 6.75, 2.3, [1.35, 2.55, 1.05, 1.05], rows, row_h=0.62, head_h=0.8, size=18, name="static_table", highlight=2)
+    text_box(s, 6.75, 5.2, 6.0, 0.8, [("정적 전력: CPU 속도를 낮춰도 줄지 않는 전력(메모리·디스크·팬 등). 0.21은 하한 성격의 값", 16, False, INK2)],
+             name="static_note")
+    text_box(s, 0.6, 6.15, 12.1, 0.45, [[("민감도 분석 ", 18, True, SDG13), ("가정한 숫자를 바꿔 보며 결과가 얼마나 흔들리는지 보는 것", 18, False, INK)]],
+             name="term_line")
+    footnote(s, f"2025년 {N['days']}일 합계, 전력시장 거래량 기준. 정적 전력 근거는 references.md 6장")
+
+    # 17 SDG
+    s, n = new()
+    header(s, "SDG 타깃과 기대 효과", "설비를 새로 사지 않고, 운영 방식만 바꿔 기여한다", n)
     sdgs = [("SDG 7.3", "에너지 효율 개선", "타깃: 2030년까지 에너지 효율 개선 속도를 두 배로",
              "같은 일을 더 적은 탄소로,\nDVFS를 더하면 더 적은 에너지로", SDG7),
             ("SDG 9.4", "청정기술로 산업·인프라 개선", "타깃: 깨끗하고 친환경적인 기술로 산업·인프라를 지속가능하게",
@@ -472,20 +644,36 @@ def build():
              name="google_line")
     footnote(s, f"자료: 유엔 SDGs(sdgs.un.org), Google 블로그(2020.4.22), Radovanović 외(2023)  |  코드·데이터 출처: {REPO_URL}")
 
-    # 11 한계와 결론
-    s = new(dark=True)
-    header(s, "한계와 결론", "보수적으로 계산했고, 더 검증할 부분이 남아 있다", 11, dark=True)
-    bullets(s, 0.6, 1.95, 12.1, 2.8, [
+    # 18 한계
+    s, n = new(dark=True)
+    header(s, "한계", "보수적으로 계산했지만, 가정이 들어간 부분이 있다", n, dark=True)
+    bullets(s, 0.6, 2.0, 12.1, 4.2, [
         f"시장 거래량 기준이라 시장 밖 태양광이 빠졌다. 반영하면 약 {N['C_monthly']:.1f}%(가정)",
         f"탄소 곡선을 미리 안다고 가정했다. 지난주 값으로 예측하면 {N['E_diff']:.1f}%p 줄어든다({N['C']:.1f}% → {N['E']:.1f}%)",
-        "평균 배출계수를 썼고, 작업 세트는 가상이다. 실제 대학 서버 로그로 검증하는 것이 다음 과제"],
-        size=20, color=WHITE, gap=16, bullet_color=SDG7)
-    box(s, 0.6, 4.1, 12.1, 1.9, "2C3F3A", name="conclusion_box")
-    text_box(s, 0.95, 4.25, 11.4, 1.6, [("언제 돌리느냐만 바꿔도 탄소는 줄고,", 28, True, SDG7),
+        "평균 배출계수를 썼으므로 작업을 옮길 때 실제로 늘고 주는 발전기의 탄소와는 다를 수 있다",
+        "작업 세트와 서버 전력은 가상이다"],
+        size=22, color=WHITE, gap=22, bullet_color=SDG7)
+    box(s, 0.6, 5.0, 12.1, 1.35, "2C3F3A", name="term_box")
+    text_box(s, 0.9, 5.1, 11.5, 1.15, [[("평균 배출계수  ", 18, True, SDG7),
+                                        ("그 시각에 돌던 발전기 전체의 평균 탄소. 작업 하나 때문에 실제로 더 돌거나 덜 도는 발전기(한계 발전기)의 탄소와는 다를 수 있다", 18, False, WHITE)]],
+             anchor=MSO_ANCHOR.MIDDLE, name="term_text")
+    footnote(s, "근거: 03_분석/summary_stage1.md 6장, 03_분석/stage2_summary.md 12장", dark=True)
+
+    # 19 향후 과제와 결론
+    s, n = new(dark=True)
+    header(s, "향후 과제와 결론", "다음 단계로 검증하고, 결론은 하나다", n, dark=True)
+    bullets(s, 0.6, 1.95, 12.1, 2.2, [
+        "실제 대학 서버의 작업 로그로 검증한다",
+        "장소 이동: 다른 지역 데이터센터로 옮길 때 데이터 전송 에너지와 비교한다",
+        "시장 밖 태양광 실측: 전력거래소 5분 단위 자료로 월별 배수 가정을 바꾼다"],
+        size=20, color=WHITE, gap=14, bullet_color=SDG7)
+    box(s, 0.6, 4.4, 12.1, 1.9, "2C3F3A", name="conclusion_box")
+    text_box(s, 0.95, 4.55, 11.4, 1.6, [("언제 돌리느냐만 바꿔도 탄소는 줄고,", 28, True, SDG7),
                                          ("얼마나 기다릴 수 있느냐가 그 크기를 정한다", 28, True, SDG7)],
              anchor=MSO_ANCHOR.MIDDLE, name="conclusion")
-    footnote(s, "평균 배출계수: 그 시각에 돌던 발전기 전체의 평균 탄소. 작업 하나 때문에 더 돌거나 덜 도는 발전기의 탄소와는 다를 수 있다", dark=True)
+    footnote(s, f"코드·데이터 출처: {REPO_URL}", dark=True)
 
+    assert len(slides) == TOTAL
     for s, note in zip(slides, notes):
         s.notes_slide.notes_text_frame.text = note
     BUILD.mkdir(parents=True, exist_ok=True)

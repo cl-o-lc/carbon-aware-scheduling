@@ -257,6 +257,58 @@ def fig_gantt_ac(plt, name: str):
     plt.close(fig)
 
 
+def fig_seasons(plt):
+    """슬라이드 5: 2025년 계절별 24시간 평균 곡선(시장 거래량 기준, 1단계 출력)."""
+    c = pd.read_csv(OUT / "ci_curves_24h.csv", index_col=0)
+    colors = {"봄": SDG13, "여름": SDG9, "가을": "#C99A00", "겨울": C_INK2}  # 가을은 SDG 7 노랑을 선이 보이게 어둡게
+    fig, ax = plt.subplots(figsize=(W, H))
+    ends = []
+    for k, col in colors.items():
+        s = c[f"2025_{k}"]
+        ax.plot(s.index, s.values, color=col, lw=3.5, marker="o", ms=5)
+        ends.append([s.iloc[-1], k, col])
+    ends.sort()
+    lo, hi = ax.get_ylim()
+    gap = (hi - lo) * 0.07
+    for i in range(1, len(ends)):
+        ends[i][0] = max(ends[i][0], ends[i - 1][0] + gap)
+    for y, k, col in ends:
+        ax.text(23.6, y, k, va="center", fontsize=20, fontweight="bold", color=col)
+    ax.set_xlim(-0.5, 25.5)
+    ax.set_xticks(range(0, 24, 3))
+    ax.set_xticklabels([f"{x}시" for x in range(0, 24, 3)])
+    ax.set_ylabel("탄소집약도 (gCO2eq/kWh)")
+    ax.grid(axis="x", visible=False)
+    fig.text(0.01, 0.012, "2025년 계절별 24시간 평균(봄 3~5월, 여름 6~8월, 가을 9~11월, 겨울 12~2월), 전력시장 거래량 기준.",
+             fontsize=12.5, color=C_INK2)
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    fig.savefig(DEST / "12_슬라이드5_계절별_곡선.png")
+    plt.close(fig)
+
+
+def fig_forecast(plt, name: str):
+    """슬라이드 14: 날짜별 절감률 분포, C(완전 정보)와 E(지난주 예측)."""
+    r = pd.read_csv(OUT / "stage2" / f"daily_results_{name}.csv")
+    a = r[r["policy"] == "A"].set_index("date")["emis_g"]
+    fig, ax = plt.subplots(figsize=(W, H))
+    bins = np.arange(-22, 31, 2)
+    for p, col, lab in (("C", SDG13, "C: 실제 곡선을 안다고 가정"), ("E", SDG9, "E: 지난주 같은 요일로 예측")):
+        sav = (1 - r[r["policy"] == p].set_index("date")["emis_g"] / a) * 100
+        ax.hist(sav, bins=bins, histtype="step", lw=3, color=col, label=f"{lab} (중앙값 {sav.median():.1f}%)")
+        ax.axvline(sav.median(), color=col, ls="--", lw=1.8)
+    ax.axvline(0, color=C_INK, lw=1.5)
+    ax.set_ylim(0, ax.get_ylim()[1] * 1.35)  # 범례 자리
+    ax.text(-0.6, ax.get_ylim()[1] * 0.93, "← 현재 관행보다 늘어남", ha="right", fontsize=16, color=C_INK2)
+    ax.set_xlabel("현재 관행(새벽 2시) 대비 날짜별 절감률 (%)")
+    ax.set_ylabel("일수")
+    ax.legend(loc="upper right", fontsize=15, frameon=False)
+    ax.grid(axis="x", visible=False)
+    fig.text(0.01, 0.012, f"2025년 {a.size}일, 전력시장 거래량 기준. 세로 파선: 중앙값.", fontsize=12.5, color=C_INK2)
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    fig.savefig(DEST / "13_슬라이드14_예측_분포.png")
+    plt.close(fig)
+
+
 def fig_cover_curve(plt, name: str):
     """표지 시안용: 05 그림에서 주석·캡션을 빼고 곡선·요금 색 띠·점 두 개·축만 남김. 축 글자 1.5배."""
     h = pd.read_csv(OUT / CURVES[name][1], parse_dates=["date"])
@@ -292,6 +344,8 @@ def main():
     print("09, 10 ok")
     print("05", fig_curve_tou(plt, name))
     fig_cover_curve(plt, name)
+    fig_seasons(plt)
+    fig_forecast(plt, name)
     fig_flow(plt)
     print("06 ok")
     print("07", {k: (round(x, 2) if isinstance(x, float) else x) for k, x in fig_weekend(plt, name).items()})
