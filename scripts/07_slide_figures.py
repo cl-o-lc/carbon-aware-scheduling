@@ -233,7 +233,7 @@ def fig_gantt_ac(plt, name: str):
             ax.barh(row.slot, min(row.end_h, x_max) - row.start_h, left=row.start_h, height=0.7,
                     color=colors[row.cls], edgecolor="white", lw=1.2)
         ax.set_yticks(range(cfg.SLOTS))
-        ax.set_yticklabels([f"슬롯{i + 1}" for i in range(cfg.SLOTS)], fontsize=15)
+        ax.set_yticklabels([f"동시 실행 {i + 1}" for i in range(cfg.SLOTS)], fontsize=15)
         ax.set_ylim(-0.6, cfg.SLOTS - 0.4)
         ax.grid(axis="y", visible=False)
         tot = r["emis_g"].sum()
