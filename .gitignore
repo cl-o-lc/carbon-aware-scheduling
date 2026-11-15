@@ -12,3 +12,5 @@ __pycache__/
 *.local.txt
 04_발표자료/*.pdf
 04_발표자료/_build/
+*.mp4
+~$*

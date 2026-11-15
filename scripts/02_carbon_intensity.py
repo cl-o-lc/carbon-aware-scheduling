@@ -18,7 +18,7 @@ import holidays
 import numpy as np
 import pandas as pd
 
-from common import (C_AQUA, C_BLUE, C_INK, C_INK2, C_ORANGE, C_YELLOW, COMPARE_YEAR, MAIN_YEAR, OUT,
+from common import (C_AQUA, C_BLUE, C_INK, C_INK2, C_ORANGE, C_YELLOW, COMPARE_YEAR, MAIN_YEAR, OUT, ROOT,
                     YEAR_COLOR, load_epsis_solar, load_year, setup_matplotlib)
 from config_emission_factors import ASSUMED, CLIP_NEGATIVE_TO_ZERO, FACTORS
 
@@ -357,7 +357,7 @@ def main():
     result = {"metrics": metrics, "daily": dsum, "top": top}
     (OUT / "ci_summary.json").write_text(json.dumps(result, ensure_ascii=False, indent=1, default=float),
                                          encoding="utf-8")
-    log.info("완료: %s", OUT)
+    log.info("완료: %s", OUT.relative_to(ROOT).as_posix())
 
 
 SOLAR_CASE = "비계량 태양광 포함(EPSIS 월별 비율로 확대)"
